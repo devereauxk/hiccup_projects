@@ -27,7 +27,7 @@ ROOT.PyConfig.IgnoreCommandLineOptions = True
 from tqdm import tqdm
 import argparse
 import os
-import array
+from array import array
 import numpy as np
 
 
@@ -89,8 +89,8 @@ def main():
 
 	# TTree output definition
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
-	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]), array('d', [0]), array('d', [0])]
-	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]), array('d', [0]), array('d', [0])]
+	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
+	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
 
 	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
 	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/D")
