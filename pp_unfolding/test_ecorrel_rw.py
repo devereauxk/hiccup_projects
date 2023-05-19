@@ -176,7 +176,7 @@ def main():
 					obs_energy_weight.push_back(s_pair.weight)
 					obs_R_L.push_back(s_pair.r)
 					obs_jet_pt.push_back(s_pair.pt)
-					preprocessed.Fill()
+					#preprocessed.Fill()
 
 	pythia_hard.stat()
 
