@@ -89,19 +89,15 @@ def main():
 
 	# TTree output definition
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
-	gen_energy_weight = ROOT.RooRealVar("gen_energy_weight", "gen_energy_weight", 0)
-	gen_R_L = ROOT.RooRealVar("gen_R_L", "gen_R_L", 0)
-	gen_jet_pt = ROOT.RooRealVar("gen_jet_pt", "gen_jet_pt", 0)
-	obs_energy_weight = ROOT.RooRealVar("obs_energy_weight", "obs_energy_weight", 0)
-	obs_R_L = ROOT.RooRealVar("obs_R_L", "obs_R_L", 0)
-	obs_jet_pt = ROOT.RooRealVar("obs_jet_pt", "obs_jet_pt", 0)
+	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
+	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
 
-	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/F")
-	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/F")
-	preprocessed.Branch("gen_jet_pt", gen_jet_pt, "gen_jet_pt/F")
-	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/F")
-	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/F")
-	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/F")
+	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
+	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/D")
+	preprocessed.Branch("gen_jet_pt", gen_jet_pt, "gen_jet_pt/D")
+	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/D")
+	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
+	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
 
  
 	for n in tqdm(range(args.nev)):
@@ -158,24 +154,46 @@ def main():
 
 		############################# SMEARED PAIRS ################################
 		# smeared EEC pairs
-		smeared_pairs = truth_pairs #TODO change this!!!!!!!!!!!!!!
+		smeared_pairs = []
 
+		"""
 		# smeared jet reconstruction
-		#jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
+		jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
 
+		for j in jets_p:
+			jet_pt = j.perp() # jet pt
+
+   			#push constutents to a vector in python
+			_v = fj.vectorPJ()
+			_ = [_v.push_back(c) for c in j.constituents()]
+
+			# n-point correlator with all charged particles
+			max_npoint = 2
+			weight_power = 1
+			dphi_cut = -9999
+			deta_cut = -9999
+			cb = ecorrel.CorrelatorBuilder(_v, jet_pt, max_npoint, weight_power, dphi_cut, deta_cut) # constructued for every jet
+
+			EEC_cb = cb.correlator(2)
+
+			EEC_weights = EEC_cb.weights() # cb.correlator(npoint).weights() constains list of weights
+			EEC_rs = EEC_cb.rs() # cb.correlator(npoint).rs() contains list of RL
+			EEC_indicies1 = EEC_cb.indices1() # contains list of 1st track in the pair (index should be based on the indices in _v)
+			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
+
+			for i in range(len(EEC_rs)):
+				event_index1 = _v[EEC_indicies1[i]].user_index()
+				event_index2 = _v[EEC_indicies2[i]].user_index()
+				smeared_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
+			"""
+				
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
-		print("len spair = ", len(smeared_pairs))
-		print("len tpair = ", len(truth_pairs))
 		for s_pair in smeared_pairs:
 			for t_pair in truth_pairs:
 				if s_pair.is_equal(t_pair):
-					gen_energy_weight.setVal(t_pair.weight)
-					gen_R_L.setVal(t_pair.r)
-					gen_jet_pt.setVal(t_pair.pt)
-					obs_energy_weight.setVal(s_pair.weight)
-					obs_R_L.setVal(s_pair.r)
-					obs_jet_pt.setVal(s_pair.pt)
+					[gen_energy_weight, gen_R_L, gen_jet_pt] = [t_pair.weight, t_pair.r, t_pair.pt]
+					[obs_energy_weight, obs_R_L, obs_jet_pt] = [s_pair.weight, s_pair.r, s_pair.pt]
 					preprocessed.Fill()
 					break
 
