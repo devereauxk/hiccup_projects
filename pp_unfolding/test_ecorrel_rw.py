@@ -176,11 +176,12 @@ def main():
 					obs_energy_weight.push_back(s_pair.weight)
 					obs_R_L.push_back(s_pair.r)
 					obs_jet_pt.push_back(s_pair.pt)
-					#preprocessed.Fill()
+					break
 
 	pythia_hard.stat()
 
 	# write TTree to output file
+	preprocessed.Fill()
 	preprocessed.Write()
 
 	# output file you want to write to
