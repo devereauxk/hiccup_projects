@@ -148,8 +148,8 @@ def main():
 
 			EEC_weights = EEC_cb.weights() # cb.correlator(npoint).weights() constains list of weights
 			EEC_rs = EEC_cb.rs() # cb.correlator(npoint).rs() contains list of RL
-			EEC_indicies1 = EEC_cb.indicies1() # contains list of 1st track in the pair (index should be based on the indices in _v)
-			EEC_indicies2 = EEC_cb.indicies2() # contains list of 2nd track in the pair
+			EEC_indicies1 = EEC_cb.indices1() # contains list of 1st track in the pair (index should be based on the indices in _v)
+			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
 			for i in range(len(EEC_rs)):
 				event_index1 = _v[EEC_indicies1[i]].user_index()
