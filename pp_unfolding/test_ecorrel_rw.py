@@ -89,19 +89,19 @@ def main():
 
 	# TTree output definition
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
-	gen_energy_weight = ROOT.vector('float')()
-	gen_R_L = ROOT.vector('float')()
-	gen_jet_pt = ROOT.vector('float')()
-	obs_energy_weight = ROOT.vector('float')()
-	obs_R_L = ROOT.vector('float')()
-	obs_jet_pt = ROOT.vector('float')()
+	gen_energy_weight = ROOT.RooRealVar("gen_energy_weight", "gen_energy_weight", 0)
+	gen_R_L = ROOT.RooRealVar("gen_R_L", "gen_R_L", 0)
+	gen_jet_pt = ROOT.RooRealVar("gen_jet_pt", "gen_jet_pt", 0)
+	obs_energy_weight = ROOT.RooRealVar("obs_energy_weight", "obs_energy_weight", 0)
+	obs_R_L = ROOT.RooRealVar("obs_R_L", "obs_R_L", 0)
+	obs_jet_pt = ROOT.RooRealVar("obs_jet_pt", "obs_jet_pt", 0)
 
-	preprocessed.Branch("gen_energy_weight", gen_energy_weight)
-	preprocessed.Branch("gen_R_L", gen_R_L)
-	preprocessed.Branch("gen_jet_pt", gen_jet_pt)
-	preprocessed.Branch("obs_energy_weight", obs_energy_weight)
-	preprocessed.Branch("obs_R_L", obs_R_L)
-	preprocessed.Branch("obs_jet_pt", obs_jet_pt)
+	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/F")
+	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/F")
+	preprocessed.Branch("gen_jet_pt", gen_jet_pt, "gen_jet_pt/F")
+	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/F")
+	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/F")
+	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/F")
 
  
 	for n in tqdm(range(args.nev)):
@@ -170,18 +170,18 @@ def main():
 		for s_pair in smeared_pairs:
 			for t_pair in truth_pairs:
 				if s_pair.is_equal(t_pair):
-					gen_energy_weight.push_back(t_pair.weight)
-					gen_R_L.push_back(t_pair.r)
-					gen_jet_pt.push_back(t_pair.pt)
-					obs_energy_weight.push_back(s_pair.weight)
-					obs_R_L.push_back(s_pair.r)
-					obs_jet_pt.push_back(s_pair.pt)
+					gen_energy_weight.setVal(t_pair.weight)
+					gen_R_L.setVal(t_pair.r)
+					gen_jet_pt.setVal(t_pair.pt)
+					obs_energy_weight.setVal(s_pair.weight)
+					obs_R_L.setVal(s_pair.r)
+					obs_jet_pt.setVal(s_pair.pt)
+					preprocessed.Fill()
 					break
 
 	pythia_hard.stat()
 
 	# write TTree to output file
-	preprocessed.Fill()
 	preprocessed.Write()
 
 	# output file you want to write to
