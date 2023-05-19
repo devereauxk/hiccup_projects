@@ -49,7 +49,7 @@ def smear_track(part, sigma=0.01):
 	smeared_pz = part.pz() * (1 + np.random.normal(0, sigma))
 	smeared_E = np.sqrt(part.m2() + smeared_pt**2 + smeared_pz**2)
 	smeared_eta = 0.5 * np.log((smeared_E + smeared_pz) / (smeared_E - smeared_pz))
-	part.reset_PtYPhiM(smeared_pt, smeared_eta, part.phi(), smeared_E())
+	part.reset_PtYPhiM(smeared_pt, smeared_eta, part.phi(), smeared_E)
 
 
 def get_args_from_settings(ssettings):
