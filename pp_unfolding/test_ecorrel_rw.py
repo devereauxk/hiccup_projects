@@ -192,8 +192,8 @@ def main():
 		for s_pair in smeared_pairs:
 			for t_pair in truth_pairs:
 				if s_pair.is_equal(t_pair):
-					[gen_energy_weight, gen_R_L, gen_jet_pt] = [t_pair.weight, t_pair.r, t_pair.pt]
-					[obs_energy_weight, obs_R_L, obs_jet_pt] = [s_pair.weight, s_pair.r, s_pair.pt]
+					[gen_energy_weight[0], gen_R_L[0], gen_jet_pt[0]] = [t_pair.weight, t_pair.r, t_pair.pt]
+					[obs_energy_weight[0], obs_R_L[0], obs_jet_pt[0]] = [s_pair.weight, s_pair.r, s_pair.pt]
 					preprocessed.Fill()
 					break
 
