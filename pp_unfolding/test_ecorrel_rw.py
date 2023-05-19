@@ -165,7 +165,8 @@ def main():
 
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
-		"""
+		print("len spair = ", len(smeared_pairs))
+		print("len tpair = ", len(truth_pairs))
 		for s_pair in smeared_pairs:
 			for t_pair in truth_pairs:
 				if s_pair.is_equal(t_pair):
@@ -176,7 +177,6 @@ def main():
 					obs_R_L.push_back(s_pair.r)
 					obs_jet_pt.push_back(s_pair.pt)
 					preprocessed.Fill()
-		"""
 
 	pythia_hard.stat()
 
