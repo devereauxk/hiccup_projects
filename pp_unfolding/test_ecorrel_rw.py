@@ -123,7 +123,6 @@ def main():
 		for part in parts_pythia_p_selected:
 			parts_pythia_p_smeared.append(smear_track(part, 0.01))
 
-		"""
 		############################# TRUTH PAIRS ################################
 		# truth level EEC pairs
 		truth_pairs = []
@@ -166,7 +165,7 @@ def main():
 
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
-		
+		"""
 		for s_pair in smeared_pairs:
 			for t_pair in truth_pairs:
 				if s_pair.is_equal(t_pair):
