@@ -28,6 +28,28 @@ from tqdm import tqdm
 import argparse
 import os
 import array
+import numpy as np
+
+
+class EEC_pair:
+	def __init__(self, _index1, _index2, _weight, _r, _pt):
+		self.index1 = _index1
+		self.index2 = _index2
+		self.weight = _weight
+		self.r = _r
+		self.pt = _pt
+
+	def is_equal(self, pair2):
+		return (self.index1 == pair2.index1 and self.index2 == pair2.index2) \
+			or (self.index1 == pair2.index2 and self.index2 == pair2.index1)
+
+
+def smear_track(part, sigma=0.01):
+	smeared_pt = part.perp() * (1 + np.random.normal(0, sigma))
+	smeared_pz = part.pz() * (1 + np.random.normal(0, sigma))
+	smeared_E = np.sqrt(part.m2() + smeared_pt**2 + smeared_pz**2)
+	smeared_eta = 0.5 * np.log((smeared_E + smeared_pz) / (smeared_E - smeared_pz))
+	part.reset_PtYPhiM(smeared_pt, smeared_eta, part.phi(), smeared_E())
 
 
 def get_args_from_settings(ssettings):
@@ -64,6 +86,23 @@ def main():
 
 	fout = ROOT.TFile(args.output, 'recreate')
 	fout.cd()
+
+	# TTree output definition
+	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
+	gen_energy_weight = ROOT.vector('float')()
+	gen_R_L = ROOT.vector('float')()
+	gen_jet_pt = ROOT.vector('float')()
+	obs_energy_weight = ROOT.vector('float')()
+	obs_R_L = ROOT.vector('float')()
+	obs_jet_pt = ROOT.vector('float')()
+
+	preprocessed.Branch("gen_energy_weight", gen_energy_weight)
+	preprocessed.Branch("gen_R_L", gen_R_L)
+	preprocessed.Branch("gen_jet_pt", gen_jet_pt)
+	preprocessed.Branch("obs_energy_weight", obs_energy_weight)
+	preprocessed.Branch("obs_R_L", obs_R_L)
+	preprocessed.Branch("obs_jet_pt", obs_jet_pt)
+
  
 	for n in tqdm(range(args.nev)):
 		if not pythia_hard.next():
@@ -74,12 +113,27 @@ def main():
 		#======================================
 		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal], 0, True)
 		parts_pythia_p_selected = parts_selector(parts_pythia_p)
-		jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_selected))) 
+
+		# assign an event-level index to each particle (zero-indexed)
+		for i in range(len(parts_pythia_p_selected)):
+			parts_pythia_p_selected[i].set_user_index(i)
+
+		# produce a second, smeared set of particle
+		parts_pythia_p_smeared = []
+		for part in parts_pythia_p_selected:
+			parts_pythia_p_smeared.append(smear_track(part, 0.01))
+
+		############################# TRUTH PAIRS ################################
+		# truth level EEC pairs
+		truth_pairs = []
+
+		# truth jet reconstruction
+		jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_selected)))
 
 		for j in jets_p:
-			# j.perp() return jet pt
+			jet_pt = j.perp() # jet pt
 
-   			# alternative: push constutents to a vector in python
+   			#push constutents to a vector in python
 			_v = fj.vectorPJ()
 			_ = [_v.push_back(c) for c in j.constituents()]
 
@@ -88,18 +142,44 @@ def main():
 			weight_power = 1
 			dphi_cut = -9999
 			deta_cut = -9999
-			cb = ecorrel.CorrelatorBuilder(_v, j.perp(), max_npoint, weight_power, dphi_cut, deta_cut) # constructued for every jet
-   
-			npoint = 2 # FIX ME: double check what npoint to set to access the two point correlators
-			if cb.correlator(npoint).rs().size() > 0:
-				# cb.correlator(npoint).rs() contains list of RL
-				# cb.correlator(npoint).weights() constains list of weights
-				# j.perp() is jet pt
-				# corr_builder.correlator(ipoint).indices1() contains list of 1st track in the pair (index should be based on the indices in _v)
-				# corr_builder.correlator(ipoint).indices2() contains list of 2nd track in the pair
+			cb = ecorrel.CorrelatorBuilder(_v, jet_pt, max_npoint, weight_power, dphi_cut, deta_cut) # constructued for every jet
 
+			EEC_cb = cb.correlator(2)
+
+			EEC_weights = EEC_cb.weights() # cb.correlator(npoint).weights() constains list of weights
+			EEC_rs = EEC_cb.rs() # cb.correlator(npoint).rs() contains list of RL
+			EEC_indicies1 = EEC_cb.indicies1() # contains list of 1st track in the pair (index should be based on the indices in _v)
+			EEC_indicies2 = EEC_cb.indicies2() # contains list of 2nd track in the pair
+
+			for i in range(len(EEC_rs)):
+				event_index1 = _v[EEC_indicies1[i]].user_index()
+				event_index2 = _v[EEC_indicies2[i]].user_index()
+				truth_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
+
+		############################# SMEARED PAIRS ################################
+		# smeared EEC pairs
+		smeared_pairs = truth_pairs #TODO change this!!!!!!!!!!!!!!
+
+		# smeared jet reconstruction
+		#jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
+
+		########################## TTree output generation #########################
+		# composite of truth and smeared pairs, fill the TTree preprocessed
+		for s_pair in smeared_pairs:
+			for t_pair in truth_pairs:
+				if s_pair.is_equal(t_pair):
+					gen_energy_weight.push_back(t_pair.weight)
+					gen_R_L.push_back(t_pair.r)
+					gen_jet_pt.push_back(t_pair.pt)
+					obs_energy_weight.push_back(s_pair.weight)
+					obs_R_L.push_back(s_pair.r)
+					obs_jet_pt.push_back(s_pair.pt)
+					preprocessed.Fill()
 
 	pythia_hard.stat()
+
+	# write TTree to output file
+	preprocessed.Write()
 
 	# output file you want to write to
 	fout.Write()
