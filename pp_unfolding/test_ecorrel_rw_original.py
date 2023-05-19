@@ -58,8 +58,8 @@ def main():
 	max_eta_jet = max_eta_hadron - jet_R0
 	parts_selector = fj.SelectorAbsEtaMax(max_eta_hadron)
 	jet_selector = fj.SelectorPtMin(20) & fj.SelectorPtMax(40) & fj.SelectorAbsEtaMax(max_eta_jet) # original: 500, 550
-	#pfc_selector0 = fj.SelectorPtMin(0.)
-	#pfc_selector1 = fj.SelectorPtMin(1.)
+	pfc_selector0 = fj.SelectorPtMin(0.)
+	pfc_selector1 = fj.SelectorPtMin(1.)
 
 	# print the banner first
 	fj.ClusterSequence.print_banner()
