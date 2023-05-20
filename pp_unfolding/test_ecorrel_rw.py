@@ -141,8 +141,6 @@ def main():
    			#push constutents to a vector in python
 			_v = fj.vectorPJ()
 			_ = [_v.push_back(c) for c in j.constituents()]
-			for const in _v:
-				print(const.user_index())
 
 			# n-point correlator with all charged particles
 			max_npoint = 2
@@ -201,8 +199,11 @@ def main():
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
 		for s_pair in smeared_pairs:
+			print(s_pair)
 			for t_pair in truth_pairs:
+				print(t_pair)
 				if s_pair.is_equal(t_pair):
+					print("are equal")
 					gen_energy_weight[0] = t_pair.weight
 					gen_R_L[0] = t_pair.r
 					gen_jet_pt[0] = t_pair.pt 
