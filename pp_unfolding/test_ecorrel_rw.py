@@ -56,6 +56,7 @@ def smear_track(part, sigma=0.01):
 	pz = part.pz() * (1 + np.random.normal(0, sigma))
 	E = np.sqrt(part.m2() + pt**2 + pz**2)
 	smeared_part = fj.PseudoJet(px, py, pz, E)
+	smeared_part.set_user_index(part.user_index())
 	return smeared_part
 
 
