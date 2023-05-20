@@ -124,7 +124,7 @@ def main():
 			i += 1
 
 		# produce a second, smeared set of particle
-		parts_pythia_p_smeared = fj.vectorPj()
+		parts_pythia_p_smeared = fj.vectorPJ()
 		for part in parts_pythia_p_selected:
 			parts_pythia_p_smeared.push_back(smear_track(part, 0.01))
 
@@ -156,7 +156,6 @@ def main():
 			EEC_indicies1 = EEC_cb.indices1() # contains list of 1st track in the pair (index should be based on the indices in _v)
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
-			print(EEC_indicies1)
 			for i in range(len(EEC_rs)):
 				event_index1 = _v[EEC_indicies1[i]].user_index()
 				event_index2 = _v[EEC_indicies2[i]].user_index()
