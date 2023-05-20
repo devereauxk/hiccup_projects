@@ -163,8 +163,6 @@ def main():
 				event_index2 = _v[EEC_indicies2[i]].user_index()
 				truth_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
 
-		exit()
-
 		############################# SMEARED PAIRS ################################
 		# smeared EEC pairs
 		smeared_pairs = truth_pairs
