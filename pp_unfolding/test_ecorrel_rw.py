@@ -154,7 +154,7 @@ def main():
 
 		############################# SMEARED PAIRS ################################
 		# smeared EEC pairs
-		smeared_pairs = []
+		smeared_pairs = truth_pairs
 
 		"""
 		# smeared jet reconstruction
