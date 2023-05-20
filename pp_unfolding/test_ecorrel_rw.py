@@ -163,9 +163,8 @@ def main():
 
 		############################# SMEARED PAIRS ################################
 		# smeared EEC pairs
-		smeared_pairs = truth_pairs
+		smeared_pairs = []
 
-		"""
 		# smeared jet reconstruction
 		jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
 
@@ -194,16 +193,12 @@ def main():
 				event_index1 = _v[EEC_indicies1[i]].user_index()
 				event_index2 = _v[EEC_indicies2[i]].user_index()
 				smeared_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
-			"""
 				
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
 		for s_pair in smeared_pairs:
-			print(s_pair)
 			for t_pair in truth_pairs:
-				print(t_pair)
 				if s_pair.is_equal(t_pair):
-					print("are equal")
 					gen_energy_weight[0] = t_pair.weight
 					gen_R_L[0] = t_pair.r
 					gen_jet_pt[0] = t_pair.pt 
