@@ -115,13 +115,19 @@ def main():
 		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal], 0, True)
 		parts_pythia_p_selected = parts_selector(parts_pythia_p)
 
+
+		print(parts_pythia_p)
 		# assign an event-level index to each particle (zero-indexed)
-		for i in range(len(parts_pythia_p_selected)):
-			parts_pythia_p_selected[i].set_user_index(i)
+		i = 0
+		for part in parts_pythia_p_selected:
+			print("runs")
+			part.set_user_index(i)
+			i += 1
 
 		# produce a second, smeared set of particle
 		parts_pythia_p_smeared = []
 		for part in parts_pythia_p_selected:
+			print("runs")
 			parts_pythia_p_smeared.append(smear_track(part, 0.01))
 
 		############################# TRUTH PAIRS ################################
