@@ -152,6 +152,7 @@ def main():
 			EEC_indicies1 = EEC_cb.indices1() # contains list of 1st track in the pair (index should be based on the indices in _v)
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
+			print(EEC_indicies1)
 			for i in range(len(EEC_rs)):
 				event_index1 = _v[EEC_indicies1[i]].user_index()
 				event_index2 = _v[EEC_indicies2[i]].user_index()
@@ -195,11 +196,8 @@ def main():
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
 		for s_pair in smeared_pairs:
-			print(s_pair)
 			for t_pair in truth_pairs:
-				print(t_pair)
 				if s_pair.is_equal(t_pair):
-					print("is equal")
 					gen_energy_weight[0] = t_pair.weight
 					gen_R_L[0] = t_pair.r
 					gen_jet_pt[0] = t_pair.pt 
