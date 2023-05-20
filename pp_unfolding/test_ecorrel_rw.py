@@ -42,6 +42,11 @@ class EEC_pair:
 	def is_equal(self, pair2):
 		return (self.index1 == pair2.index1 and self.index2 == pair2.index2) \
 			or (self.index1 == pair2.index2 and self.index2 == pair2.index1)
+	
+	def __str__(self):
+		return "EEC pair with (index1, index2, weight, RL, pt) = (" + \
+			str(self.index1) + ", " + str(self.index2) + ", " + str(self.weight) + \
+			", " + str(self.r) + ", " + str(self.pt) + ")"
 
 
 def smear_track(part, sigma=0.01):
@@ -190,8 +195,11 @@ def main():
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
 		for s_pair in smeared_pairs:
+			print(s_pair)
 			for t_pair in truth_pairs:
+				print(t_pair)
 				if s_pair.is_equal(t_pair):
+					print("is equal")
 					gen_energy_weight[0] = t_pair.weight
 					gen_R_L[0] = t_pair.r
 					gen_jet_pt[0] = t_pair.pt 
