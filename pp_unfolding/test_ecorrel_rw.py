@@ -50,11 +50,13 @@ class EEC_pair:
 
 
 def smear_track(part, sigma=0.01):
-	smeared_pt = part.perp() * (1 + np.random.normal(0, sigma))
-	smeared_pz = part.pz() * (1 + np.random.normal(0, sigma))
-	smeared_E = np.sqrt(part.m2() + smeared_pt**2 + smeared_pz**2)
-	smeared_eta = 0.5 * np.log((smeared_E + smeared_pz) / (smeared_E - smeared_pz))
-	return part.reset_PtYPhiM(smeared_pt, smeared_eta, part.phi(), smeared_E)
+	pt = part.perp() * (1 + np.random.normal(0, sigma))
+	px = pt * np.cos(part.phi())
+	py = pt * np.sin(part.phi())
+	pz = part.pz() * (1 + np.random.normal(0, sigma))
+	E = np.sqrt(part.m2() + pt**2 + pz**2)
+	smeared_part = fj.PseudoJet(px, py, pz, E)
+	return smeared_part
 
 
 def get_args_from_settings(ssettings):
