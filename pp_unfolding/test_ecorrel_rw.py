@@ -116,9 +116,7 @@ def main():
 		#======================================
 		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal], 0, True)
 		parts_pythia_p_selected = parts_selector(parts_pythia_p)
-
-
-		print(parts_pythia_p)
+		
 		# assign an event-level index to each particle (zero-indexed)
 		i = 0
 		for part in parts_pythia_p_selected:
@@ -143,6 +141,8 @@ def main():
    			#push constutents to a vector in python
 			_v = fj.vectorPJ()
 			_ = [_v.push_back(c) for c in j.constituents()]
+			for const in v:
+				print(const.user_index())
 
 			# n-point correlator with all charged particles
 			max_npoint = 2
