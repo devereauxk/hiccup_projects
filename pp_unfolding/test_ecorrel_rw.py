@@ -120,15 +120,13 @@ def main():
 		# assign an event-level index to each particle (zero-indexed)
 		i = 0
 		for part in parts_pythia_p_selected:
-			print("runs")
 			part.set_user_index(i)
 			i += 1
 
 		# produce a second, smeared set of particle
-		parts_pythia_p_smeared = []
+		parts_pythia_p_smeared = fj.vectorPj()
 		for part in parts_pythia_p_selected:
-			print("runs")
-			parts_pythia_p_smeared.append(smear_track(part, 0.01))
+			parts_pythia_p_smeared.push_back(smear_track(part, 0.01))
 
 		############################# TRUTH PAIRS ################################
 		# truth level EEC pairs
@@ -217,6 +215,7 @@ def main():
 
 	# write TTree to output file
 	preprocessed.Write()
+	preprocessed.Scan()
 
 	# output file you want to write to
 	fout.Write()
