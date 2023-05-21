@@ -24,26 +24,29 @@ def weighted_binary_crossentropy(y_true, y_pred):
     
     return K.mean(t_loss)
 
-def omnifold(theta0,theta_unknown_S,iterations,model,verbose=0):
+def omnifold(theta0_G,theta0_S,theta_unknown_S,iterations,model,verbose=0):
 
-    weights = np.empty(shape=(iterations, 2, len(theta0)))
+    weights = np.empty(shape=(iterations, 2))
     # shape = (iteration, step, event)
     
-    theta0_G = theta0[:,0]
-    theta0_S = theta0[:,1]
-    
-    labels0 = np.zeros(len(theta0))
-    labels_unknown = np.ones(len(theta_unknown_S))
+    labels0 = np.zeros(theta0_G.shape)
+    labels_unknown = np.ones(theta_unknown_S.shape)
     
     xvals_1 = np.concatenate((theta0_S, theta_unknown_S))
     yvals_1 = np.concatenate((labels0, labels_unknown))
+    
+    print(xvals_1.shape)
+    print(yvals_1.shape)
 
     xvals_2 = np.concatenate((theta0_G, theta0_G))
     yvals_2 = np.concatenate((labels0, labels_unknown))
+    
+    print(xvals_2.shape)
+    print(yvals_2.shape)
 
     # initial iterative weights are ones
-    weights_pull = np.ones(len(theta0_S))
-    weights_push = np.ones(len(theta0_S))
+    weights_pull = np.ones(theta0_S.shape)
+    weights_push = np.ones(theta0_S.shape)
     
     for i in range(iterations):
 
@@ -58,7 +61,7 @@ def omnifold(theta0,theta_unknown_S,iterations,model,verbose=0):
             print("STEP 1\n")
             pass
             
-        weights_1 = np.concatenate((weights_push, np.ones(len(theta_unknown_S))))
+        weights_1 = np.concatenate((weights_push, np.ones(theta_unknown_S.shape)))
 
         X_train_1, X_test_1, Y_train_1, Y_test_1, w_train_1, w_test_1 = train_test_split(xvals_1, yvals_1, weights_1)
 
@@ -77,8 +80,14 @@ def omnifold(theta0,theta_unknown_S,iterations,model,verbose=0):
                   validation_data=(X_test_1, Y_test_1),
                   verbose=verbose)
 
-        weights_pull = weights_push * reweight(theta0_S,model)
-        weights[i, :1, :] = weights_pull
+        print(weights_push.shape)
+        rw = reweight(theta0_S,model)
+        print(rw.shape)
+        
+        weights_pull = weights_push * reweight(theta0_S,model)   
+        print(weights_pull.shape)
+        print(weights.shape)
+        weights[i, 0] = weights_pull
 
         # STEP 2: classify Gen. to reweighted Gen. (which is reweighted by weights_pull)
         # weights Gen. --> reweighted Gen.
@@ -107,7 +116,7 @@ def omnifold(theta0,theta_unknown_S,iterations,model,verbose=0):
                   verbose=verbose)
         
         weights_push = reweight(theta0_G,model)
-        weights[i, 1:2, :] = weights_push
+        weights[i, 1] = weights_push
         pass
         
     return weights
