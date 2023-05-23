@@ -116,11 +116,11 @@ def main():
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
     
-	# debug tree definition
-    	debug = ROOT.TTree("debug", "true and smeared particle-level")
-    	[gen_pt, obs_pt] = [array('d', [0]) for i in range(2)]
-   	debug.Branch("gen_pt", gen_pt, "gen_pt/D")
-    	debug.Branch("obs_pt", obs_pt, "obs_pt/D")
+    # debug tree definition
+    debug = ROOT.TTree("debug", "true and smeared particle-level")
+    [gen_pt, obs_pt] = [array('d', [0]) for i in range(2)]
+    debug.Branch("gen_pt", gen_pt, "gen_pt/D")
+    debug.Branch("obs_pt", obs_pt, "obs_pt/D")
 
  
 	for n in tqdm(range(args.nev)):
@@ -134,23 +134,23 @@ def main():
 		parts_pythia_p_selected = parts_selector(parts_pythia_p)
 
 		# assign an event-level index to each particle (zero-indexed)
-        	# AND produce a second, smeared set of particles
+        # AND produce a second, smeared set of particles
 		i = 0
-       		parts_pythia_p_smeared = fj.vectorPJ()
+        parts_pythia_p_smeared = fj.vectorPJ()
 		for part in parts_pythia_p_selected:
 			part.set_user_index(i)
-            		gen_pt = part.perp()
+            gen_pt = part.perp()
             
-            		# smearing + track efficiency
-            		obs_pt = -9999
-            		if do_keep_track(part):
-                		smeared_part = smear_track(part, 0.01)
-                		parts_pythia_p_smeared.push_back(smeared_part)
-                		obs_pt = smeared_part.perp()
+            # smearing + track efficiency
+            obs_pt = -9999
+            if do_keep_track(part):
+                smeared_part = smear_track(part, 0.01)
+                parts_pythia_p_smeared.push_back(smeared_part)
+                obs_pt = smeared_part.perp()
                 
             
-            	debug.Fill()
-            	i += 1
+            debug.Fill()
+            i += 1
             
 		############################# TRUTH PAIRS ################################
 		# truth level EEC pairs
@@ -237,7 +237,7 @@ def main():
 	# write TTree to output file
 	preprocessed.Write()
 	preprocessed.Scan()
-    	debug.Write()
+    debug.Write()
 
 	# output file you want to write to
 	fout.Write()
