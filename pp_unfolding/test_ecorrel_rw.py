@@ -29,9 +29,10 @@ import argparse
 import os
 from array import array
 import numpy as np
+import uproot as ur
 
 # load track efficiency tree
-tr_eff_file = uproot.open("tr_eff.root")
+tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
 
 
