@@ -143,7 +143,7 @@ def main():
 			gen_pt[0] = part.perp()
             
 			# smearing + track efficiency
-			obs_pt = -9999
+			obs_pt[0] = -9999
 			if do_keep_track(part):
 				smeared_part = smear_track(part, 0.01)
 				parts_pythia_p_smeared.push_back(smeared_part)
