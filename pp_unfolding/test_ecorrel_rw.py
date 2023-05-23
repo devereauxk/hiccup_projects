@@ -140,14 +140,14 @@ def main():
 		parts_pythia_p_smeared = fj.vectorPJ()
 		for part in parts_pythia_p_selected:
 			part.set_user_index(i)
-			gen_pt = part.perp()
+			gen_pt[0] = part.perp()
             
 			# smearing + track efficiency
 			obs_pt = -9999
 			if do_keep_track(part):
 				smeared_part = smear_track(part, 0.01)
 				parts_pythia_p_smeared.push_back(smeared_part)
-				obs_pt = smeared_part.perp()
+				obs_pt[0] = smeared_part.perp()
                 
 			debug.Fill()
 			i += 1
