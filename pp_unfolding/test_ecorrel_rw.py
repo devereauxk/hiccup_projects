@@ -35,6 +35,7 @@ import uproot as ur
 tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
 
+dummyval = -9999
 
 class EEC_pair:
 	def __init__(self, _index1, _index2, _weight, _r, _pt):
@@ -109,6 +110,7 @@ def main():
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
 	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
 	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
+	obs_thrown = array('d', [0])
 
 	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
 	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/D")
@@ -116,6 +118,7 @@ def main():
 	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/D")
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
+	preprocessed.Branch("obs_thrown", obs_thrown, "obs_thrown/D")
     
 	# debug tree definitions
 	particle_pt_tree = ROOT.TTree("particle_pt", "true and smeared particle-level")
@@ -225,17 +228,28 @@ def main():
 				
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
-		for s_pair in smeared_pairs:
-			for t_pair in truth_pairs:
+		for t_pair in truth_pairs:
+
+			gen_energy_weight[0] = t_pair.weight
+			gen_R_L[0] = t_pair.r
+			gen_jet_pt[0] = t_pair.pt
+			obs_thrown[0] = 0
+
+			match_found = False
+			for s_pair in smeared_pairs:
 				if s_pair.is_equal(t_pair):
-					gen_energy_weight[0] = t_pair.weight
-					gen_R_L[0] = t_pair.r
-					gen_jet_pt[0] = t_pair.pt 
 					obs_energy_weight[0] = s_pair.weight
 					obs_R_L[0] = s_pair.r
 					obs_jet_pt[0] = s_pair.pt
 					preprocessed.Fill()
+					match_found = True
 					break
+			if not match_found:
+				obs_energy_weight[0] = dummyval
+				obs_R_L[0] = dummyval
+				obs_jet_pt[0] = dummyval
+				obs_thrown[0] = 1
+				preprocessed.Fill()
 
 		# fill jet resolution debug ttree
 		for s_jet in jets_p_smeared:
