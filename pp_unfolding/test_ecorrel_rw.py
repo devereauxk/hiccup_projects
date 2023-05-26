@@ -117,11 +117,16 @@ def main():
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
     
-	# debug tree definition
-	debug = ROOT.TTree("debug", "true and smeared particle-level")
+	# debug tree definitions
+	particle_pt_tree = ROOT.TTree("particle_pt", "true and smeared particle-level")
 	[gen_pt, obs_pt] = [array('d', [0]) for i in range(2)]
-	debug.Branch("gen_pt", gen_pt, "gen_pt/D")
-	debug.Branch("obs_pt", obs_pt, "obs_pt/D")
+	particle_pt_tree.Branch("gen_pt", gen_pt, "gen_pt/D")
+	particle_pt_tree.Branch("obs_pt", obs_pt, "obs_pt/D")
+
+	jet_pt_tree = ROOT.TTree("jet_pt", "true and smeared particle-level")
+	[gen_jet_pt, obs_jet_pt] = [array('d', [0]) for i in range(2)]
+	jet_pt_tree.Branch("gen_pt", gen_jet_pt, "gen_pt/D")
+	jet_pt_tree.Branch("obs_pt", obs_jet_pt, "obs_pt/D")
 
  
 	for n in tqdm(range(args.nev)):
@@ -135,7 +140,7 @@ def main():
 		parts_pythia_p_selected = parts_selector(parts_pythia_p)
 
 		# assign an event-level index to each particle (zero-indexed)
-        	# AND produce a second, smeared set of particles
+        # AND produce a second, smeared set of particles
 		i = 0
 		parts_pythia_p_smeared = fj.vectorPJ()
 		for part in parts_pythia_p_selected:
@@ -149,7 +154,7 @@ def main():
 				parts_pythia_p_smeared.push_back(smeared_part)
 				obs_pt[0] = smeared_part.perp()
                 
-			debug.Fill()
+			particle_pt_tree.Fill()
 			i += 1
             
 		############################# TRUTH PAIRS ################################
@@ -190,9 +195,9 @@ def main():
 		smeared_pairs = []
 
 		# smeared jet reconstruction
-		jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
+		jets_p_smeared = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
 
-		for j in jets_p:
+		for j in jets_p_smeared:
 			jet_pt = j.perp() # jet pt
 
    			#push constutents to a vector in python
@@ -232,12 +237,25 @@ def main():
 					preprocessed.Fill()
 					break
 
+		# fill jet resolution debug ttree
+		for s_jet in jets_p_smeared:
+			for t_jet in jets_p:
+				delta_R = np.sqrt( (s_jet.eta() - t_jet.eta())**2 + (s_jet.phi() - t_jet.phi())**2 )
+				if delta_R <= 0.6:
+					gen_jet_pt[0] = t_jet.perp()
+					obs_jet_pt[0] = s_jet.perp()
+					jet_pt_tree.Fill()
+					break
+
 	pythia_hard.stat()
 
 	# write TTree to output file
 	preprocessed.Write()
 	preprocessed.Scan()
-	debug.Write()
+	particle_pt_tree.Write()
+	particle_pt_tree.Scan()
+	jet_pt_tree.Write()
+	jet_pt_tree.Scan()
 
 	# output file you want to write to
 	fout.Write()
