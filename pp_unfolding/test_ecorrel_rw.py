@@ -124,7 +124,6 @@ def main():
 	particle_pt_tree.Branch("obs_pt", obs_pt, "obs_pt/D")
 
 	jet_pt_tree = ROOT.TTree("jet_pt", "true and smeared particle-level")
-	[gen_jet_pt, obs_jet_pt] = [array('d', [0]) for i in range(2)]
 	jet_pt_tree.Branch("gen_pt", gen_jet_pt, "gen_pt/D")
 	jet_pt_tree.Branch("obs_pt", obs_jet_pt, "obs_pt/D")
 
