@@ -124,8 +124,9 @@ def main():
 	particle_pt_tree.Branch("obs_pt", obs_pt, "obs_pt/D")
 
 	jet_pt_tree = ROOT.TTree("jet_pt", "true and smeared particle-level")
-	jet_pt_tree.Branch("gen_pt", gen_jet_pt, "gen_pt/D")
-	jet_pt_tree.Branch("obs_pt", obs_jet_pt, "obs_pt/D")
+	[gen_jet_pt_debug, obs_jet_pt_debug] = [array('d', [0]) for i in range(2)]
+	jet_pt_tree.Branch("gen_pt", gen_jet_pt_debug, "gen_pt/D")
+	jet_pt_tree.Branch("obs_pt", obs_jet_pt_debug, "obs_pt/D")
 
  
 	for n in tqdm(range(args.nev)):
@@ -241,8 +242,8 @@ def main():
 			for t_jet in jets_p:
 				delta_R = np.sqrt( (s_jet.eta() - t_jet.eta())**2 + (s_jet.phi() - t_jet.phi())**2 )
 				if delta_R <= 0.6:
-					gen_jet_pt[0] = t_jet.perp()
-					obs_jet_pt[0] = s_jet.perp()
+					gen_jet_pt_debug[0] = t_jet.perp()
+					obs_jet_pt_debug[0] = s_jet.perp()
 					jet_pt_tree.Fill()
 					break
 
