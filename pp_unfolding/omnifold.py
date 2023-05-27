@@ -1,9 +1,8 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from t
-from sklearn.model_selection import train_test_split
 from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.model_selection import train_test_split
 
 def reweight(events,model,batch_size=10000):
     f = model.predict(events, batch_size=batch_size)
