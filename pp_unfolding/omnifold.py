@@ -119,7 +119,7 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
                               verbose=1,
                               restore_best_weights=True)
     
-    w_data = np.ones(len(theta_unknown_S[theta_unknown_S!=dummyval]))
+    w_data = np.ones(len(theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))
     
     weights = np.empty(shape=(iterations, 2, len(theta0)))
     # shape = (iteration, step, event)
@@ -130,8 +130,8 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
     labels0 = np.zeros(len(theta0))
     labels_unknown = np.ones(len(theta_unknown_S))
     
-    xvals_1 = np.concatenate((theta0_S, theta_unknown_S[theta_unknown_S!=dummyval]))
-    yvals_1 = np.concatenate((labels0, np.ones(len(theta_unknown_S[theta_unknown_S!=dummyval]))))
+    xvals_1 = np.concatenate((theta0_S, theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))
+    yvals_1 = np.concatenate((labels0, np.ones(len(theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))))
 
     xvals_2 = np.concatenate((theta0_G, theta0_G))
     yvals_2 = np.concatenate((labels0, labels_unknown))
@@ -157,12 +157,12 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         model.compile(loss='binary_crossentropy',
                     optimizer='Adam',
                     metrics=['accuracy'])
-        model.fit(X_train_1[X_train_1!=dummyval],
-                Y_train_1[X_train_1!=dummyval],
-                sample_weight=w_train_1[X_train_1!=dummyval],
+        model.fit(X_train_1[X_train_1[:,0]!=dummyval],
+                Y_train_1[X_train_1[:,0]!=dummyval],
+                sample_weight=w_train_1[X_train_1[:,0]!=dummyval],
                 epochs=200,
                 batch_size=10000,
-                validation_data=(X_test_1[X_test_1!=dummyval], Y_test_1[X_test_1!=dummyval], w_test_1[X_test_1!=dummyval]),
+                validation_data=(X_test_1[X_test_1[:,0]!=dummyval], Y_test_1[X_test_1[:,0]!=dummyval], w_test_1[X_test_1[:,0]!=dummyval]),
                 callbacks=[earlystopping],
                 verbose=1)
 
@@ -174,9 +174,9 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         #weights_pull[theta0_S==dummyval] = 1. 
         
         #Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
-        xvals_1b = np.concatenate([theta0_G[theta0_S!=dummyval],theta0_G[theta0_S!=dummyval]])
-        yvals_1b = np.concatenate([np.ones(len(theta0_G[theta0_S!=dummyval])),np.zeros(len(theta0_G[theta0_S!=dummyval]))])
-        weights_1b = np.concatenate([weights_pull[theta0_S!=dummyval],np.ones(len(theta0_G[theta0_S!=dummyval]))])
+        xvals_1b = np.concatenate([theta0_G[theta0_S[:,0]!=dummyval],theta0_G[theta0_S[:,0]!=dummyval]])
+        yvals_1b = np.concatenate([np.ones(len(theta0_G[theta0_S[:,0]!=dummyval])),np.zeros(len(theta0_G[theta0_S[:,0]!=dummyval]))])
+        weights_1b = np.concatenate([weights_pull[theta0_S[:,0]!=dummyval],np.ones(len(theta0_G[theta0_S[:,0]!=dummyval]))])
         
         X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
             xvals_1b, yvals_1b, weights_1b)    
@@ -228,9 +228,9 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         #weights_push[theta0_G==dummyval] = 1. 
         
         #Another option is to assign the average weight: <w|x_reco>.  To do this, we need to estimate this quantity.
-        xvals_1b = np.concatenate([theta0_S[theta0_G!=dummyval],theta0_S[theta0_G!=dummyval]])
-        yvals_1b = np.concatenate([np.ones(len(theta0_S[theta0_G!=dummyval])),np.zeros(len(theta0_S[theta0_G!=dummyval]))])
-        weights_1b = np.concatenate([weights_push[theta0_G!=dummyval],np.ones(len(theta0_S[theta0_G!=dummyval]))])
+        xvals_1b = np.concatenate([theta0_S[theta0_G[:,0]!=dummyval],theta0_S[theta0_G[:,0]!=dummyval]])
+        yvals_1b = np.concatenate([np.ones(len(theta0_S[theta0_G[:,0]!=dummyval])),np.zeros(len(theta0_S[theta0_G[:,0]!=dummyval]))])
+        weights_1b = np.concatenate([weights_push[theta0_G[:,0]!=dummyval],np.ones(len(theta0_S[theta0_G[:,0]!=dummyval]))])
         
         X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
             xvals_1b, yvals_1b, weights_1b)    
