@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as K
+from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 
 def reweight(events,model,batch_size=10000):
@@ -24,29 +25,26 @@ def weighted_binary_crossentropy(y_true, y_pred):
     
     return K.mean(t_loss)
 
-def omnifold(theta0_G,theta0_S,theta_unknown_S,iterations,model,verbose=0):
+def omnifold(theta0,theta_unknown_S,iterations,model,verbose=0):
 
-    weights = np.empty(shape=(iterations, 2))
+    weights = np.empty(shape=(iterations, 2, len(theta0)))
     # shape = (iteration, step, event)
     
-    labels0 = np.zeros(theta0_G.shape)
-    labels_unknown = np.ones(theta_unknown_S.shape)
+    theta0_G = theta0[:,0]
+    theta0_S = theta0[:,1]
+    
+    labels0 = np.zeros(len(theta0))
+    labels_unknown = np.ones(len(theta_unknown_S))
     
     xvals_1 = np.concatenate((theta0_S, theta_unknown_S))
     yvals_1 = np.concatenate((labels0, labels_unknown))
-    
-    print(xvals_1.shape)
-    print(yvals_1.shape)
 
     xvals_2 = np.concatenate((theta0_G, theta0_G))
     yvals_2 = np.concatenate((labels0, labels_unknown))
-    
-    print(xvals_2.shape)
-    print(yvals_2.shape)
 
     # initial iterative weights are ones
-    weights_pull = np.ones(theta0_S.shape)
-    weights_push = np.ones(theta0_S.shape)
+    weights_pull = np.ones(len(theta0_S))
+    weights_push = np.ones(len(theta0_S))
     
     for i in range(iterations):
 
@@ -61,7 +59,7 @@ def omnifold(theta0_G,theta0_S,theta_unknown_S,iterations,model,verbose=0):
             print("STEP 1\n")
             pass
             
-        weights_1 = np.concatenate((weights_push, np.ones(theta_unknown_S.shape)))
+        weights_1 = np.concatenate((weights_push, np.ones(len(theta_unknown_S))))
 
         X_train_1, X_test_1, Y_train_1, Y_test_1, w_train_1, w_test_1 = train_test_split(xvals_1, yvals_1, weights_1)
 
@@ -80,14 +78,8 @@ def omnifold(theta0_G,theta0_S,theta_unknown_S,iterations,model,verbose=0):
                   validation_data=(X_test_1, Y_test_1),
                   verbose=verbose)
 
-        print(weights_push.shape)
-        rw = reweight(theta0_S,model)
-        print(rw.shape)
-        
-        weights_pull = weights_push * reweight(theta0_S,model)   
-        print(weights_pull.shape)
-        print(weights.shape)
-        weights[i, 0] = weights_pull
+        weights_pull = weights_push * reweight(theta0_S,model)
+        weights[i, :1, :] = weights_pull
 
         # STEP 2: classify Gen. to reweighted Gen. (which is reweighted by weights_pull)
         # weights Gen. --> reweighted Gen.
@@ -116,7 +108,154 @@ def omnifold(theta0_G,theta0_S,theta_unknown_S,iterations,model,verbose=0):
                   verbose=verbose)
         
         weights_push = reweight(theta0_G,model)
-        weights[i, 1] = weights_push
+        weights[i, 1:2, :] = weights_push
         pass
+        
+    return weights
+
+def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
+
+    earlystopping = EarlyStopping(patience=10,
+                              verbose=1,
+                              restore_best_weights=True)
+    
+    w_data = np.ones(len(theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))
+    
+    weights = np.empty(shape=(iterations, 2, len(theta0)))
+    # shape = (iteration, step, event)
+    
+    theta0_G = theta0[:,0]
+    theta0_S = theta0[:,1]
+    
+    labels0 = np.zeros(len(theta0))
+    labels_unknown = np.ones(len(theta_unknown_S))
+    
+    xvals_1 = np.concatenate((theta0_S, theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))
+    yvals_1 = np.concatenate((labels0, np.ones(len(theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))))
+
+    xvals_2 = np.concatenate((theta0_G, theta0_G))
+    yvals_2 = np.concatenate((labels0, labels_unknown))
+
+    # initial iterative weights are ones
+    weights_pull = np.ones(len(theta0_S))
+    weights_push = np.ones(len(theta0_S))
+    
+    for i in range(iterations):
+        print("\nITERATION: {}\n".format(i + 1))
+
+        # STEP 1: classify Sim. (which is reweighted by weights_push) to Data
+        # weights reweighted Sim. --> Data
+        print("STEP 1\n")
+
+        print("runs now")
+        
+        weights_1 = np.concatenate((weights_push, w_data))
+        #QUESTION: concatenation here confuses me
+        # actual weights for Sim., ones for Data (not MC weights)
+
+        X_train_1, X_test_1, Y_train_1, Y_test_1, w_train_1, w_test_1 = train_test_split(
+            xvals_1, yvals_1, weights_1) #REMINDER: made up of synthetic+measured
+        
+        model.compile(loss='binary_crossentropy',
+                    optimizer='Adam',
+                    metrics=['accuracy'])
+        print(X_train_1[X_train_1[:,0]!=dummyval])
+        print(Y_train_1[X_train_1[:,0]!=dummyval])
+        print(w_train_1[X_train_1[:,0]!=dummyval])
+        model.fit(X_train_1[X_train_1[:,0]!=dummyval],
+                Y_train_1[X_train_1[:,0]!=dummyval],
+                sample_weight=w_train_1[X_train_1[:,0]!=dummyval],
+                epochs=20,
+                batch_size=2000,
+                validation_data=(X_test_1[X_test_1[:,0]!=dummyval], Y_test_1[X_test_1[:,0]!=dummyval], w_test_1[X_test_1[:,0]!=dummyval]),
+                verbose=1)
+        
+        print("runs")
+
+        weights_pull = weights_push * reweight(theta0_S, model) 
+
+        # STEP 1B: Need to do something with events that don't pass reco.
+        
+        #One option is to take the prior:
+        #weights_pull[theta0_S==dummyval] = 1. 
+        
+        #Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
+        xvals_1b = np.concatenate([theta0_G[theta0_S[:,0]!=dummyval],theta0_G[theta0_S[:,0]!=dummyval]])
+        yvals_1b = np.concatenate([np.ones(len(theta0_G[theta0_S[:,0]!=dummyval])),np.zeros(len(theta0_G[theta0_S[:,0]!=dummyval]))])
+        weights_1b = np.concatenate([weights_pull[theta0_S[:,0]!=dummyval],np.ones(len(theta0_G[theta0_S[:,0]!=dummyval]))])
+        
+        X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
+            xvals_1b, yvals_1b, weights_1b)    
+        
+        model.compile(loss='binary_crossentropy',
+                    optimizer='Adam',
+                    metrics=['accuracy'])
+        model.fit(X_train_1b,
+                Y_train_1b,
+                sample_weight=w_train_1b,
+                epochs=200,
+                batch_size=10000,
+                validation_data=(X_test_1b, Y_test_1b, w_test_1b),
+                callbacks=[earlystopping],
+                verbose=1)
+        
+        average_vals = reweight(theta0_G[theta0_S[:,0]==dummyval], model)
+        weights_pull[theta0_S[:,0]==dummyval] = average_vals
+        
+        weights[i, :1, :] = weights_pull
+
+        # STEP 2: classify Gen. to reweighted Gen. (which is reweighted by weights_pull)
+        # weights Gen. --> reweighted Gen.
+        print("\nSTEP 2\n")
+
+        weights_2 = np.concatenate((np.ones(len(theta0_G)), weights_pull))
+        # ones for Gen. (not MC weights), actual weights for (reweighted) Gen.
+
+        X_train_2, X_test_2, Y_train_2, Y_test_2, w_train_2, w_test_2 = train_test_split(
+            xvals_2, yvals_2, weights_2)
+
+        model.compile(loss='binary_crossentropy',
+                    optimizer='Adam',
+                    metrics=['accuracy'])
+        model.fit(X_train_2,
+                Y_train_2,
+                sample_weight=w_train_2,
+                epochs=200,
+                batch_size=2000,
+                validation_data=(X_test_2, Y_test_2, w_test_2),
+                callbacks=[earlystopping],
+                verbose=1)
+
+        weights_push = reweight(theta0_G, model)
+        
+        # STEP 2B: Need to do something with events that don't pass truth    
+        
+        #One option is to take the prior:
+        #weights_push[theta0_G==dummyval] = 1. 
+        
+        #Another option is to assign the average weight: <w|x_reco>.  To do this, we need to estimate this quantity.
+        xvals_1b = np.concatenate([theta0_S[theta0_G[:,0]!=dummyval],theta0_S[theta0_G[:,0]!=dummyval]])
+        yvals_1b = np.concatenate([np.ones(len(theta0_S[theta0_G[:,0]!=dummyval])),np.zeros(len(theta0_S[theta0_G[:,0]!=dummyval]))])
+        weights_1b = np.concatenate([weights_push[theta0_G[:,0]!=dummyval],np.ones(len(theta0_S[theta0_G[:,0]!=dummyval]))])
+        
+        X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
+            xvals_1b, yvals_1b, weights_1b)    
+        
+        model.compile(loss='binary_crossentropy',
+                    optimizer='Adam',
+                    metrics=['accuracy'])
+        model.fit(X_train_1b,
+                Y_train_1b,
+                sample_weight=w_train_1b,
+                epochs=200,
+                batch_size=10000,
+                validation_data=(X_test_1b, Y_test_1b, w_test_1b),
+                callbacks=[earlystopping],
+                verbose=1)
+        
+        average_vals = reweight(theta0_S[theta0_G[:,0]==dummyval], model)
+        weights_push[theta0_G[:,0]==dummyval] = average_vals  
+        
+        weights[i, 1:2, :] = weights_push
         
     return weights

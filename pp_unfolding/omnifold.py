@@ -147,26 +147,32 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         # weights reweighted Sim. --> Data
         print("STEP 1\n")
 
+        print("runs now")
+        
         weights_1 = np.concatenate((weights_push, w_data))
         #QUESTION: concatenation here confuses me
         # actual weights for Sim., ones for Data (not MC weights)
 
         X_train_1, X_test_1, Y_train_1, Y_test_1, w_train_1, w_test_1 = train_test_split(
             xvals_1, yvals_1, weights_1) #REMINDER: made up of synthetic+measured
-
+        
         model.compile(loss='binary_crossentropy',
                     optimizer='Adam',
                     metrics=['accuracy'])
+        print(X_train_1[X_train_1[:,0]!=dummyval])
+        print(Y_train_1[X_train_1[:,0]!=dummyval])
+        print(w_train_1[X_train_1[:,0]!=dummyval])
         model.fit(X_train_1[X_train_1[:,0]!=dummyval],
                 Y_train_1[X_train_1[:,0]!=dummyval],
                 sample_weight=w_train_1[X_train_1[:,0]!=dummyval],
-                epochs=200,
-                batch_size=10000,
+                epochs=20,
+                batch_size=2000,
                 validation_data=(X_test_1[X_test_1[:,0]!=dummyval], Y_test_1[X_test_1[:,0]!=dummyval], w_test_1[X_test_1[:,0]!=dummyval]),
-                callbacks=[earlystopping],
                 verbose=1)
+        
+        print("runs")
 
-        weights_pull = weights_push * reweight(theta0_S) 
+        weights_pull = weights_push * reweight(theta0_S, model) 
 
         # STEP 1B: Need to do something with events that don't pass reco.
         
@@ -179,7 +185,7 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         weights_1b = np.concatenate([weights_pull[theta0_S[:,0]!=dummyval],np.ones(len(theta0_G[theta0_S[:,0]!=dummyval]))])
         
         X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
-            xvals_1b, yvals_1b, weights_1b)    
+            xvals_1b, yvals_1b, weights_1b)
         
         model.compile(loss='binary_crossentropy',
                     optimizer='Adam',
@@ -193,8 +199,8 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
                 callbacks=[earlystopping],
                 verbose=1)
         
-        average_vals = reweight(theta0_G[theta0_S==dummyval])
-        weights_pull[theta0_S==dummyval] = average_vals
+        average_vals = reweight(theta0_G[theta0_S[:,0]==dummyval], model)
+        weights_pull[theta0_S[:,0]==dummyval] = average_vals
         
         weights[i, :1, :] = weights_pull
 
@@ -220,7 +226,7 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
                 callbacks=[earlystopping],
                 verbose=1)
 
-        weights_push = reweight(theta0_G)
+        weights_push = reweight(theta0_G, model)
         
         # STEP 2B: Need to do something with events that don't pass truth    
         
@@ -247,8 +253,8 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
                 callbacks=[earlystopping],
                 verbose=1)
         
-        average_vals = reweight(theta0_S[theta0_G==dummyval])
-        weights_push[theta0_G==dummyval] = average_vals  
+        average_vals = reweight(theta0_S[theta0_G[:,0]==dummyval], model)
+        weights_push[theta0_G[:,0]==dummyval] = average_vals  
         
         weights[i, 1:2, :] = weights_push
         
