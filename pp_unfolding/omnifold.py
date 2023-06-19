@@ -177,9 +177,10 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         # STEP 1B: Need to do something with events that don't pass reco.
         
         #One option is to take the prior:
-        #weights_pull[theta0_S==dummyval] = 1. 
+        weights_pull[theta0_S[:,0]==dummyval] = 1. 
         
         #Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
+        """
         xvals_1b = np.concatenate([theta0_G[theta0_S[:,0]!=dummyval],theta0_G[theta0_S[:,0]!=dummyval]])
         yvals_1b = np.concatenate([np.ones(len(theta0_G[theta0_S[:,0]!=dummyval])),np.zeros(len(theta0_G[theta0_S[:,0]!=dummyval]))])
         weights_1b = np.concatenate([weights_pull[theta0_S[:,0]!=dummyval],np.ones(len(theta0_G[theta0_S[:,0]!=dummyval]))])
@@ -201,6 +202,7 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         
         average_vals = reweight(theta0_G[theta0_S[:,0]==dummyval], model)
         weights_pull[theta0_S[:,0]==dummyval] = average_vals
+        """
         
         weights[i, :1, :] = weights_pull
 
@@ -231,9 +233,10 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         # STEP 2B: Need to do something with events that don't pass truth    
         
         #One option is to take the prior:
-        #weights_push[theta0_G==dummyval] = 1. 
+        weights_push[theta0_G[:,0]==dummyval] = 1. 
         
         #Another option is to assign the average weight: <w|x_reco>.  To do this, we need to estimate this quantity.
+        """
         xvals_1b = np.concatenate([theta0_S[theta0_G[:,0]!=dummyval],theta0_S[theta0_G[:,0]!=dummyval]])
         yvals_1b = np.concatenate([np.ones(len(theta0_S[theta0_G[:,0]!=dummyval])),np.zeros(len(theta0_S[theta0_G[:,0]!=dummyval]))])
         weights_1b = np.concatenate([weights_push[theta0_G[:,0]!=dummyval],np.ones(len(theta0_S[theta0_G[:,0]!=dummyval]))])
@@ -254,7 +257,8 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
                 verbose=1)
         
         average_vals = reweight(theta0_S[theta0_G[:,0]==dummyval], model)
-        weights_push[theta0_G[:,0]==dummyval] = average_vals  
+        weights_push[theta0_G[:,0]==dummyval] = average_vals
+        """
         
         weights[i, 1:2, :] = weights_push
         
