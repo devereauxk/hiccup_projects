@@ -1,0 +1,5 @@
+[INFO] This is o2-sim version 1.2.0 (7ded66f05)
+[INFO] Built by ALIBUILD:v1.12.0, ALIDIST-REV:839c822b999aca7d3b32604a97ca7f890fd4a4e8 on OS:Linux-3.10.0-957.27.2.el7.x86_64
+[INFO] BINDING TO ADDRESS ipc:///tmp/o2sim-notifications-19384 type pub
+[INFO] Running with 2 sim workers 
+[INFO] CREATING SIM SHARED MEM SEGMENT FOR 2 WORKERS

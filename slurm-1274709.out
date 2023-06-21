@@ -1,0 +1,2 @@
+/home/kdevereaux/hiccup_projects/process_O2_sim.sh: line 6: /home/kdevereaux/o2-sim: No such file or directory
+srun: error: hiccup10: task 0: Exited with exit code 127
