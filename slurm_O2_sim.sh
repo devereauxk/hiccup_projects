@@ -3,7 +3,7 @@
 #SBATCH -q regular
 #SBATCH -J O2_sim
 #SBATCH -t 02:00:00
-#SBATCH --output=/home/kdevereaux/ali_practice/slurm/slurm-%j.out
+#SBATCH --output=/home/kdevereaux/ali_practice/slurm-%j.out
 
 #OpenMP settings:
 export OMP_NUM_THREADS=1
