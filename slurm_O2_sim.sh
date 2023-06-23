@@ -10,4 +10,4 @@ export OMP_PLACES=threads
 export OMP_PROC_BIND=spread
 
 #run the application:
-srun -n 1 -c 1 /home/kdevereaux/hiccup_projects/process_O2_sim.sh
+srun -n 1 -c 20 --exclusive /home/kdevereaux/hiccup_projects/process_O2_sim.sh
