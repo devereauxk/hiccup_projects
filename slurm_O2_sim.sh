@@ -1,13 +1,11 @@
 #!/bin/bash
-#SBATCH -N 1
-#SBATCH -q regular
-#SBATCH -J O2_sim
-#SBATCH -t 02:00:00
+#SBATCH --job-name=O2_sim
+#SBATCH --nodes=1 --ntasks=1 --cpus-per-task=1
+#SBATCH --partition=std
+#SBATCH --time=24:00:00
+#SBATCH --output=/home/kdevereaux/hiccup_projects/slurm-%j.out
 
-#OpenMP settings:
-export OMP_NUM_THREADS=1
-export OMP_PLACES=threads
-export OMP_PROC_BIND=spread
+source /home/kdevereaux/env.txt
 
 #run the application:
-srun -n 1 -c 20 --exclusive /home/kdevereaux/hiccup_projects/process_O2_sim.sh
+srun /home/kdevereaux/hiccup_projects/process_O2_sim.sh
