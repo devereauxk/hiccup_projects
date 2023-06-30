@@ -1,8 +1,10 @@
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
+import pickle
 
 def reweight(events,model,batch_size=10000):
     f = model.predict(events, batch_size=batch_size)
@@ -70,7 +72,7 @@ def omnifold(theta0,theta_unknown_S,iterations,model,verbose=0):
         model.compile(loss=weighted_binary_crossentropy,
                       optimizer='Adam',
                       metrics=['accuracy'])
-
+        
         model.fit(X_train_1,
                   Y_train_1,
                   epochs=20,
@@ -140,44 +142,55 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
     weights_pull = np.ones(len(theta0_S))
     weights_push = np.ones(len(theta0_S))
     
+    print("tests")
+    print(theta0_G.shape)
+    print(theta0_S.shape)
+    print(theta_unknown_S.shape)
+
+    print(theta0_G[theta0_S[:,0]!=-9999].shape)
+    print(theta0_G[theta0_S[:,0]==-9999].shape)
+    
+    
     for i in range(iterations):
         print("\nITERATION: {}\n".format(i + 1))
 
         # STEP 1: classify Sim. (which is reweighted by weights_push) to Data
         # weights reweighted Sim. --> Data
         print("STEP 1\n")
-
-        print("runs now")
         
         weights_1 = np.concatenate((weights_push, w_data))
         #QUESTION: concatenation here confuses me
         # actual weights for Sim., ones for Data (not MC weights)
+        
+        print("shufling weights")
 
         X_train_1, X_test_1, Y_train_1, Y_test_1, w_train_1, w_test_1 = train_test_split(
             xvals_1, yvals_1, weights_1) #REMINDER: made up of synthetic+measured
         
+        print("compiling model")
+        
         model.compile(loss='binary_crossentropy',
                     optimizer='Adam',
-                    metrics=['accuracy'])
-        print(X_train_1[X_train_1[:,0]!=dummyval])
-        print(Y_train_1[X_train_1[:,0]!=dummyval])
-        print(w_train_1[X_train_1[:,0]!=dummyval])
+                    metrics=['accuracy'],
+                    weighted_metrics=[])
+        
+        print("fitting model")
+        
         model.fit(X_train_1[X_train_1[:,0]!=dummyval],
                 Y_train_1[X_train_1[:,0]!=dummyval],
-                sample_weight=w_train_1[X_train_1[:,0]!=dummyval],
+                sample_weight=pd.Series(w_train_1[X_train_1[:,0]!=dummyval]),
                 epochs=20,
                 batch_size=2000,
                 validation_data=(X_test_1[X_test_1[:,0]!=dummyval], Y_test_1[X_test_1[:,0]!=dummyval], w_test_1[X_test_1[:,0]!=dummyval]),
+                callbacks=[earlystopping],
                 verbose=1)
-        
-        print("runs")
 
         weights_pull = weights_push * reweight(theta0_S, model) 
 
         # STEP 1B: Need to do something with events that don't pass reco.
         
         #One option is to take the prior:
-        #weights_pull[theta0_S==dummyval] = 1. 
+        #weights_pull[theta0_S[:,0]==dummyval] = 1. 
         
         #Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
         xvals_1b = np.concatenate([theta0_G[theta0_S[:,0]!=dummyval],theta0_G[theta0_S[:,0]!=dummyval]])
@@ -185,11 +198,12 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         weights_1b = np.concatenate([weights_pull[theta0_S[:,0]!=dummyval],np.ones(len(theta0_G[theta0_S[:,0]!=dummyval]))])
         
         X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
-            xvals_1b, yvals_1b, weights_1b)    
+            xvals_1b, yvals_1b, weights_1b)
         
         model.compile(loss='binary_crossentropy',
                     optimizer='Adam',
-                    metrics=['accuracy'])
+                    metrics=['accuracy'],
+                    weighted_metrics=[])
         model.fit(X_train_1b,
                 Y_train_1b,
                 sample_weight=w_train_1b,
@@ -198,6 +212,9 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
                 validation_data=(X_test_1b, Y_test_1b, w_test_1b),
                 callbacks=[earlystopping],
                 verbose=1)
+        
+        print(theta0_G[theta0_S[:,0]==dummyval])
+        print(theta0_G[theta0_S[:,0]==dummyval].shape)
         
         average_vals = reweight(theta0_G[theta0_S[:,0]==dummyval], model)
         weights_pull[theta0_S[:,0]==dummyval] = average_vals
@@ -216,7 +233,8 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
 
         model.compile(loss='binary_crossentropy',
                     optimizer='Adam',
-                    metrics=['accuracy'])
+                    metrics=['accuracy'],
+                    weighted_metrics=[])
         model.fit(X_train_2,
                 Y_train_2,
                 sample_weight=w_train_2,
@@ -231,9 +249,10 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         # STEP 2B: Need to do something with events that don't pass truth    
         
         #One option is to take the prior:
-        #weights_push[theta0_G==dummyval] = 1. 
+        #weights_push[theta0_G[:,0]==dummyval] = 1. 
         
         #Another option is to assign the average weight: <w|x_reco>.  To do this, we need to estimate this quantity.
+        """
         xvals_1b = np.concatenate([theta0_S[theta0_G[:,0]!=dummyval],theta0_S[theta0_G[:,0]!=dummyval]])
         yvals_1b = np.concatenate([np.ones(len(theta0_S[theta0_G[:,0]!=dummyval])),np.zeros(len(theta0_S[theta0_G[:,0]!=dummyval]))])
         weights_1b = np.concatenate([weights_push[theta0_G[:,0]!=dummyval],np.ones(len(theta0_S[theta0_G[:,0]!=dummyval]))])
@@ -243,7 +262,8 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
         
         model.compile(loss='binary_crossentropy',
                     optimizer='Adam',
-                    metrics=['accuracy'])
+                    metrics=['accuracy'],
+                    weighted_metrics=[])
         model.fit(X_train_1b,
                 Y_train_1b,
                 sample_weight=w_train_1b,
@@ -254,8 +274,33 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
                 verbose=1)
         
         average_vals = reweight(theta0_S[theta0_G[:,0]==dummyval], model)
-        weights_push[theta0_G[:,0]==dummyval] = average_vals  
+        weights_push[theta0_G[:,0]==dummyval] = average_vals
+        """
+
         
         weights[i, 1:2, :] = weights_push
         
     return weights
+
+
+def save_object(obj, dir):
+    """
+        obj: the object (pointer)
+        dir: the full directory wrt this utils.py file including the file name it should be stored in and the file type
+            (ex: "dir/file_name.p")
+        saves the object in the directory file specified
+    """
+    file = open(dir, "wb")
+    pickle.dump(obj, file)
+    file.close()
+    
+def load_object(dir):
+    """
+        dir: the full directory wrt this utils.py file including the file name it should be stored in and the file type
+            (ex: "dir/file_name.p")
+        returns the object saved in this directory
+    """
+    file = open(dir, "rb")
+    obj = pickle.load(file)
+    file.close()
+    return obj
