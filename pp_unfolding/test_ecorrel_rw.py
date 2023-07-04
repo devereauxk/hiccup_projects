@@ -76,7 +76,7 @@ def get_args_from_settings(ssettings):
 	parser = argparse.ArgumentParser(description='pythia8 fastjet on the fly')
 	pyconf.add_standard_pythia_args(parser)
 	parser.add_argument('--output', default="test_ecorrel_rw.root", type=str)
-	# parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
+	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
 	args = parser.parse_args()
 	return args
 
@@ -148,6 +148,7 @@ def main():
 		for part in parts_pythia_p_selected:
 			part.set_user_index(i)
 			gen_pt[0] = part.perp()
+			print(part.perp())
             
 			# smearing + track efficiency
 			obs_pt[0] = -9999
