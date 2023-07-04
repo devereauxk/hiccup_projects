@@ -62,10 +62,9 @@ labels = ["energy weight", "$R_L$", "jet $p_T$"]
 # In[ ]:
 
 
-natural_file = "preprocess_tr_eff.root"
+natural_file = "preprocess_tr_eff_setAB.root"
 natural_tree = ur.open("%s:preprocessed"%(natural_file))
 natural_df = natural_tree.arrays(library="pd") #open the TTree as a pandas data frame
-#natural_df = natural_reco_df[natural_reco_df["obs_hfs_pt"] != 0] #remove empty entries
 
 
 # ### Take a quick look at the data
@@ -73,13 +72,13 @@ natural_df = natural_tree.arrays(library="pd") #open the TTree as a pandas data 
 # In[ ]:
 
 
-natural_df.describe()
+print(natural_df.describe())
 
 
 # In[ ]:
 
 
-natural_df.head(10)
+print(natural_df.head(10))
 
 
 # In[ ]:
@@ -88,7 +87,6 @@ natural_df.head(10)
 # particle pt relative error
 part_pt_tree = ur.open("%s:particle_pt"%(natural_file))
 part_pt_df = part_pt_tree.arrays(library="pd")
-#part_pt_df = part_pt_df[part_pt_df['obs_pt'] != -9999]
 part_pt = part_pt_df['gen_pt']
 part_pt_smeared = part_pt_df['obs_pt']
 
@@ -97,10 +95,14 @@ plt.hist(part_pt, binning, alpha=0.5, label='true')
 plt.hist(part_pt_smeared, binning, alpha=0.5, label='smeared')
 plt.legend()
 plt.xlabel('particle pt')
+plt.savefig("part_pt.png")
+plt.close()
 
 binning = np.linspace(-0.05, 0.05, 100)
 plt.hist( (part_pt_smeared - part_pt) / part_pt, binning)
 plt.title('particle pt relative error')
+plt.savefig("part_pt_err.png")
+plt.close()
 
 
 # ### Jet pt resolution
@@ -119,10 +121,14 @@ plt.hist(jet_pt, binning, alpha=0.5, label='true')
 plt.hist(jet_pt_smeared, binning, alpha=0.5, label='smeared')
 plt.legend()
 plt.xlabel('jet pt')
+plt.savefig("jet_pt.png")
+plt.close()
 
 binning = np.linspace(-0.2, 0.2, 100)
 plt.hist( (jet_pt_smeared - jet_pt) / jet_pt, binning)
 plt.title('jet pt relative error')
+plt.savefig("jet_pt_err.png")
+plt.close()
 
 
 # ### Import "synthetic simulation", both generated and reconstructed level.
@@ -130,16 +136,15 @@ plt.title('jet pt relative error')
 # In[ ]:
 
 
-synthetic_file = "preprocess_tr_eff.root"
+synthetic_file = "preprocess_tr_eff_setAB.root"
 synth_tree = ur.open("%s:preprocessed"%(synthetic_file))
 synth_df = synth_tree.arrays(library="pd")
-#synth_df = synth_df[synth_df["obs_hfs_pt"] != 0]
 
 
 # In[ ]:
 
 
-synth_df.tail(10) #look at some entries
+print(synth_df.tail(10)) #look at some entries
 
 
 # ### define 4 main datasets
@@ -164,6 +169,7 @@ obs_thrown = synth_df['obs_thrown'].to_numpy() # binary if pair DOESN'T pass eff
 N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
 #N_Events = 1000
 
+"""
 # Synthetic
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
@@ -176,6 +182,20 @@ theta_unknown_S = theta_unknown_S[:N_Events]
 
 
 obs_thrown = obs_thrown[:N_Events]
+"""
+
+halfway = round(N_Events / 2)
+
+# Synthetic
+theta0_G = theta0_G[:halfway]
+theta0_S = theta0_S[:halfway]
+
+theta0 = np.stack([theta0_G, theta0_S], axis=1)
+
+# Natural
+theta_unknown_G = theta_unknown_G[halfway:N_Events]
+theta_unknown_S = theta_unknown_S[halfway:N_Events]
+
 
 
 # In[ ]:
@@ -226,13 +246,13 @@ model_dis = Model(inputs=inputs, outputs=outputs)
 # In[ ]:
 
 
-N_Iterations = 1
+N_Iterations = 2
 myweights = of.omnifold_tr_eff(theta0,theta_unknown_S,N_Iterations,model_dis,dummyval=-9999)
 
 print(myweights)
 print(myweights.shape)
 
-of.save_object(myweights, "./myweights.p")
+of.save_object(myweights, "./myweights_cross_ref.p")
 
 
 # In[ ]:
