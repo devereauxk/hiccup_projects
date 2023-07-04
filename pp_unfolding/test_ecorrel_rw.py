@@ -91,7 +91,7 @@ def main():
 	max_eta_hadron = 0.9  # ALICE
 	jet_R0 = 0.4
 	max_eta_jet = max_eta_hadron - jet_R0
-	parts_selector = fj.SelectorAbsEtaMax(max_eta_hadron)
+	parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
 	jet_selector = fj.SelectorPtMin(20) & fj.SelectorPtMax(40) & fj.SelectorAbsEtaMax(max_eta_jet) 
 	pfc_selector0 = fj.SelectorPtMin(0.)
 	pfc_selector1 = fj.SelectorPtMin(1.)
