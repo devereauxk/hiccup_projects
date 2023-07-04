@@ -148,7 +148,6 @@ def main():
 		for part in parts_pythia_p_selected:
 			part.set_user_index(i)
 			gen_pt[0] = part.perp()
-			print(part.perp())
             
 			# smearing + track efficiency
 			obs_pt[0] = -9999
