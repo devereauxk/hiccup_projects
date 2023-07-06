@@ -83,6 +83,7 @@ def get_args_from_settings(ssettings):
 
 def main():
 	mycfg = []
+    mycfg.append("StringPT:sigma=0.2") # for producing slightly different data sets, default is 0.335 GeV
 	ssettings = "--py-ecm 5020 --py-pthatmin 20"
 	args = get_args_from_settings(ssettings)
 	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
