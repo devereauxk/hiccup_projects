@@ -29,11 +29,13 @@ import argparse
 import os
 from array import array
 import numpy as np
+import uproot as ur
 
 # load track efficiency tree
-tr_eff_file = uproot.open("tr_eff.root")
+tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
 
+dummyval = -9999
 
 class EEC_pair:
 	def __init__(self, _index1, _index2, _weight, _r, _pt):
@@ -74,14 +76,14 @@ def get_args_from_settings(ssettings):
 	parser = argparse.ArgumentParser(description='pythia8 fastjet on the fly')
 	pyconf.add_standard_pythia_args(parser)
 	parser.add_argument('--output', default="test_ecorrel_rw.root", type=str)
-	parser.add_argument('--user-seed', help='pythia seed',
-											default=1111, type=int)
+	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
 	args = parser.parse_args()
 	return args
 
 
 def main():
 	mycfg = []
+    mycfg.append("StringPT:sigma=0.2") # for producing slightly different data sets, default is 0.335 GeV
 	ssettings = "--py-ecm 5020 --py-pthatmin 20"
 	args = get_args_from_settings(ssettings)
 	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
@@ -89,7 +91,7 @@ def main():
 	max_eta_hadron = 0.9  # ALICE
 	jet_R0 = 0.4
 	max_eta_jet = max_eta_hadron - jet_R0
-	parts_selector = fj.SelectorAbsEtaMax(max_eta_hadron)
+	parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
 	jet_selector = fj.SelectorPtMin(20) & fj.SelectorPtMax(40) & fj.SelectorAbsEtaMax(max_eta_jet) 
 	pfc_selector0 = fj.SelectorPtMin(0.)
 	pfc_selector1 = fj.SelectorPtMin(1.)
@@ -108,6 +110,7 @@ def main():
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
 	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
 	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
+	obs_thrown = array('d', [0])
 
 	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
 	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/D")
@@ -115,12 +118,18 @@ def main():
 	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/D")
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
+	preprocessed.Branch("obs_thrown", obs_thrown, "obs_thrown/D")
     
-    # debug tree definition
-    debug = ROOT.TTree("debug", "true and smeared particle-level")
-    [gen_pt, obs_pt] = [array('d', [0]) for i in range(2)]
-    debug.Branch("gen_pt", gen_pt, "gen_pt/D")
-    debug.Branch("obs_pt", obs_pt, "obs_pt/D")
+	# debug tree definitions
+	particle_pt_tree = ROOT.TTree("particle_pt", "true and smeared particle-level")
+	[gen_pt, obs_pt] = [array('d', [0]) for i in range(2)]
+	particle_pt_tree.Branch("gen_pt", gen_pt, "gen_pt/D")
+	particle_pt_tree.Branch("obs_pt", obs_pt, "obs_pt/D")
+
+	jet_pt_tree = ROOT.TTree("jet_pt", "true and smeared particle-level")
+	[gen_jet_pt_debug, obs_jet_pt_debug] = [array('d', [0]) for i in range(2)]
+	jet_pt_tree.Branch("gen_pt", gen_jet_pt_debug, "gen_pt/D")
+	jet_pt_tree.Branch("obs_pt", obs_jet_pt_debug, "obs_pt/D")
 
  
 	for n in tqdm(range(args.nev)):
@@ -136,21 +145,20 @@ def main():
 		# assign an event-level index to each particle (zero-indexed)
         # AND produce a second, smeared set of particles
 		i = 0
-        parts_pythia_p_smeared = fj.vectorPJ()
+		parts_pythia_p_smeared = fj.vectorPJ()
 		for part in parts_pythia_p_selected:
 			part.set_user_index(i)
-            gen_pt = part.perp()
+			gen_pt[0] = part.perp()
             
-            # smearing + track efficiency
-            obs_pt = -9999
-            if do_keep_track(part):
-                smeared_part = smear_track(part, 0.01)
-                parts_pythia_p_smeared.push_back(smeared_part)
-                obs_pt = smeared_part.perp()
+			# smearing + track efficiency
+			obs_pt[0] = -9999
+			if do_keep_track(part):
+				smeared_part = smear_track(part, 0.01)
+				parts_pythia_p_smeared.push_back(smeared_part)
+				obs_pt[0] = smeared_part.perp()
                 
-            
-            debug.Fill()
-            i += 1
+			particle_pt_tree.Fill()
+			i += 1
             
 		############################# TRUTH PAIRS ################################
 		# truth level EEC pairs
@@ -190,9 +198,9 @@ def main():
 		smeared_pairs = []
 
 		# smeared jet reconstruction
-		jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
+		jets_p_smeared = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_smeared)))
 
-		for j in jets_p:
+		for j in jets_p_smeared:
 			jet_pt = j.perp() # jet pt
 
    			#push constutents to a vector in python
@@ -220,16 +228,37 @@ def main():
 				
 		########################## TTree output generation #########################
 		# composite of truth and smeared pairs, fill the TTree preprocessed
-		for s_pair in smeared_pairs:
-			for t_pair in truth_pairs:
+		for t_pair in truth_pairs:
+
+			gen_energy_weight[0] = t_pair.weight
+			gen_R_L[0] = t_pair.r
+			gen_jet_pt[0] = t_pair.pt
+			obs_thrown[0] = 0
+
+			match_found = False
+			for s_pair in smeared_pairs:
 				if s_pair.is_equal(t_pair):
-					gen_energy_weight[0] = t_pair.weight
-					gen_R_L[0] = t_pair.r
-					gen_jet_pt[0] = t_pair.pt 
 					obs_energy_weight[0] = s_pair.weight
 					obs_R_L[0] = s_pair.r
 					obs_jet_pt[0] = s_pair.pt
 					preprocessed.Fill()
+					match_found = True
+					break
+			if not match_found:
+				obs_energy_weight[0] = dummyval
+				obs_R_L[0] = dummyval
+				obs_jet_pt[0] = dummyval
+				obs_thrown[0] = 1
+				preprocessed.Fill()
+
+		# fill jet resolution debug ttree
+		for s_jet in jets_p_smeared:
+			for t_jet in jets_p:
+				delta_R = np.sqrt( (s_jet.eta() - t_jet.eta())**2 + (s_jet.phi() - t_jet.phi())**2 )
+				if delta_R <= 0.6:
+					gen_jet_pt_debug[0] = t_jet.perp()
+					obs_jet_pt_debug[0] = s_jet.perp()
+					jet_pt_tree.Fill()
 					break
 
 	pythia_hard.stat()
@@ -237,7 +266,10 @@ def main():
 	# write TTree to output file
 	preprocessed.Write()
 	preprocessed.Scan()
-    debug.Write()
+	particle_pt_tree.Write()
+	particle_pt_tree.Scan()
+	jet_pt_tree.Write()
+	jet_pt_tree.Scan()
 
 	# output file you want to write to
 	fout.Write()
