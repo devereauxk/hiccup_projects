@@ -22,6 +22,8 @@ from matplotlib import pyplot as plt
 from IPython.display import Image
 pd.set_option('display.max_columns', None) # to see all columns of df.head()
 
+np.set_printoptions(edgeitems=15)
+
 
 # In[3]:
 
@@ -62,7 +64,7 @@ labels = ["energy weight", "$R_L$", "jet $p_T$"]
 # In[ ]:
 
 
-natural_file = "preprocess_tr_eff_setAB.root"
+natural_file = "preprocess_tr_eff_sigmap2.root"
 natural_tree = ur.open("%s:preprocessed"%(natural_file))
 natural_df = natural_tree.arrays(library="pd") #open the TTree as a pandas data frame
 
@@ -79,6 +81,22 @@ print(natural_df.describe())
 
 
 print(natural_df.head(10))
+
+
+# ### Import "synthetic simulation", both generated and reconstructed level.
+
+# In[ ]:
+
+
+synthetic_file = "preprocess_tr_eff_cross_ref.root"
+synth_tree = ur.open("%s:preprocessed"%(synthetic_file))
+synth_df = synth_tree.arrays(library="pd")
+
+
+# In[ ]:
+
+
+print(synth_df.tail(10)) #look at some entries
 
 
 # In[ ]:
@@ -111,40 +129,31 @@ plt.close()
 
 
 # jet pt relative error
-jet_pt_tree = ur.open("%s:jet_pt"%(natural_file))
-jet_pt_df = jet_pt_tree.arrays(library="pd")
-jet_pt = jet_pt_df['gen_pt']
-jet_pt_smeared = jet_pt_df['obs_pt']
+jet_pt_tree_nat = ur.open("%s:jet_pt"%(natural_file))
+jet_pt_df_nat = jet_pt_tree_nat.arrays(library="pd")
+jet_pt_nat = jet_pt_df_nat['gen_pt']
+jet_pt_nat_smeared = jet_pt_df_nat['obs_pt']
+
+jet_pt_tree_synth = ur.open("%s:jet_pt"%(synthetic_file))
+jet_pt_df_synth = jet_pt_tree_synth.arrays(library="pd")
+jet_pt_synth = jet_pt_df_synth['gen_pt']
+jet_pt_synth_smeared = jet_pt_df_synth['obs_pt']
 
 binning = np.linspace(20, 40, 100)
-plt.hist(jet_pt, binning, alpha=0.5, label='true')
-plt.hist(jet_pt_smeared, binning, alpha=0.5, label='smeared')
+plt.hist(jet_pt_synth,binning,color='blue',alpha=0.5,label="MC, true")
+plt.hist(jet_pt_synth_smeared,binning,histtype="step",color='black',ls=':',label="MC, reco")
+plt.hist(jet_pt_nat,binning,color='orange',alpha=0.5,label="Data, true")
+plt.hist(jet_pt_nat_smeared,binning,histtype="step",color='black',label="Data, reco")
 plt.legend()
 plt.xlabel('jet pt')
 plt.savefig("jet_pt.png")
 plt.close()
 
 binning = np.linspace(-0.2, 0.2, 100)
-plt.hist( (jet_pt_smeared - jet_pt) / jet_pt, binning)
+plt.hist( (jet_pt_nat_smeared - jet_pt_nat) / jet_pt_nat, binning)
 plt.title('jet pt relative error')
 plt.savefig("jet_pt_err.png")
 plt.close()
-
-
-# ### Import "synthetic simulation", both generated and reconstructed level.
-
-# In[ ]:
-
-
-synthetic_file = "preprocess_tr_eff_setAB.root"
-synth_tree = ur.open("%s:preprocessed"%(synthetic_file))
-synth_df = synth_tree.arrays(library="pd")
-
-
-# In[ ]:
-
-
-print(synth_df.tail(10)) #look at some entries
 
 
 # ### define 4 main datasets
@@ -167,9 +176,9 @@ obs_thrown = synth_df['obs_thrown'].to_numpy() # binary if pair DOESN'T pass eff
 
 
 N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
-#N_Events = 1000
+#N_Events = 100000
 
-"""
+
 # Synthetic
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
@@ -182,8 +191,10 @@ theta_unknown_S = theta_unknown_S[:N_Events]
 
 
 obs_thrown = obs_thrown[:N_Events]
-"""
 
+
+
+""" halfway split of events 
 halfway = round(N_Events / 2)
 
 # Synthetic
@@ -195,6 +206,7 @@ theta0 = np.stack([theta0_G, theta0_S], axis=1)
 # Natural
 theta_unknown_G = theta_unknown_G[halfway:N_Events]
 theta_unknown_S = theta_unknown_S[halfway:N_Events]
+"""
 
 
 
@@ -247,12 +259,20 @@ model_dis = Model(inputs=inputs, outputs=outputs)
 
 
 N_Iterations = 2
+
+""" run to evaluate new data, calculate new weights """
+"""
 myweights = of.omnifold_tr_eff(theta0,theta_unknown_S,N_Iterations,model_dis,dummyval=-9999)
 
 print(myweights)
 print(myweights.shape)
 
-of.save_object(myweights, "./myweights_cross_ref.p")
+of.save_object(myweights, "./myweights_sigmap2.p")
+"""
+
+
+""" run to load in saved weights """
+myweights = of.load_object("./myweights_sigmap2.p")
 
 
 # In[ ]:
@@ -297,12 +317,18 @@ for iteration in range(N_Iterations):
 plt.clf()
 binning = np.logspace(-4, np.log10(0.4), 100)
 
-_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0], color='blue', alpha=0.5, label="MC, true") # true
-_,_,_=plt.hist(theta0_S[:,1], binning, weights=theta0_S[:,0], color='orange', alpha=0.5, label="data, smeared") # smeared
+_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0], color='blue', alpha=0.5, label="MC, true")
+_,_,_=plt.hist(theta0_S[:,1], binning, weights=theta0_S[:,0], histtype="step", color='black',ls=':',label="MC, reco")
+_,_,_=plt.hist(theta_unknown_G[:,1], binning, weights=theta_unknown_G[:,0], color='orange',alpha=0.5,label="Data, true")
+_,_,_=plt.hist(theta_unknown_S[:,1], binning, weights=theta_unknown_S[:,0], histtype="step",color='black',label="Data, reco")
+
 _,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0] * myweights[-1, 0, :], color='black', histtype="step", label="OmniFolded", lw=2) # omnifolded
+
 
 plt.xscale('log')
 plt.yscale('log')
+plt.xlim(3E-3, 0.5)
+plt.ylim(1E-1,1E3)
 
 plt.xlabel("$R_L$")
 plt.ylabel("cs")
@@ -312,26 +338,44 @@ plt.savefig("unfolded_EEC.png")
 plt.close()
 
 
-# In[ ]:
 
-
-myweights[-1]
-
+# ### true vs smeared EEC calculation, normalized by number of jets
 
 # In[ ]:
 
 
-myweights
+# calculate number of jets in each sample
+Njets_theta0_G = len(np.unique(theta0_G[:,2]))
+Njets_theta0_S = len(np.unique(theta0_S[:,2]))
+Njets_theta_unknown_G = len(np.unique(theta_unknown_G[:,2]))
+Njets_theta_unknown_S = len(np.unique(theta_unknown_S[:,2]))
+Njets_unfolded = (Njets_theta0_G / Njets_theta0_S) * Njets_theta_unknown_S
+
+print("number of MC true jets   = " + str(Njets_theta0_G))
+print("number of MC reco jets   = " + str(Njets_theta0_S))
+print("number of Data true jets = " + str(Njets_theta_unknown_G))
+print("ESTIMATED BY ME          = " + str(Njets_unfolded))
+print("number of Data reco jets = " + str(Njets_theta0_S))
+
+plt.clf()
+binning = np.logspace(-4, np.log10(0.4), 100)
+
+_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0]/Njets_theta0_G, color='blue', alpha=0.5, label="MC, true")
+_,_,_=plt.hist(theta0_S[:,1], binning, weights=theta0_S[:,0]/Njets_theta0_S, histtype="step", color='black',ls=':',label="MC, reco")
+_,_,_=plt.hist(theta_unknown_G[:,1], binning, weights=theta_unknown_G[:,0]/Njets_theta_unknown_G, color='orange',alpha=0.5,label="Data, true")
+_,_,_=plt.hist(theta_unknown_S[:,1], binning, weights=theta_unknown_S[:,0]/Njets_theta_unknown_S, histtype="step",color='black',label="Data, reco")
+
+_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0] * myweights[-1, 0, :] / Njets_unfolded, color='black', histtype="step", label="OmniFolded", lw=2) # omnifolded
 
 
-# In[ ]:
+plt.xscale('log')
+plt.yscale('log')
+plt.xlim(3E-3, 0.5)
+plt.ylim(1E-5,1E-1)
 
-
-pass_reco = np.random.binomial(1,0.9,30)
-
-
-# In[ ]:
-
-
-pass_reco
-
+plt.xlabel("$R_L$")
+plt.ylabel("cs / number of jets")
+plt.title("EEC calculation")
+plt.legend(frameon=False, loc='upper left')
+plt.savefig("unfolded_EEC_normbyjets.png")
+plt.close()
