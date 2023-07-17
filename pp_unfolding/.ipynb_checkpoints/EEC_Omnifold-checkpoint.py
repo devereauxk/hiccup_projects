@@ -379,3 +379,17 @@ plt.title("EEC calculation")
 plt.legend(frameon=False, loc='upper left')
 plt.savefig("unfolded_EEC_normbyjets.png")
 plt.close()
+
+N_truth_jets = len(np.unique(theta0_G[:,2]))
+N_det_jets = len(np.unique(theta0_S[:,2]))
+
+print("number of truth jets: " + str(N_truth_jets))
+print("number of det   jets: " + str(N_det_jets))
+print("percentage = " + str(N_det_jets / N_truth_jets))
+
+N_truth_pairs = len(theta0_G)
+N_det_pairs = len(np.unique(theta0_S[:,0]))
+
+print("number of truth pairs: " + str(N_truth_pairs))
+print("number of det   pairs: " + str(N_det_pairs))
+print("percentage = " + str(N_det_pairs / N_truth_pairs))
