@@ -367,7 +367,7 @@ class Multifold():
             np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco])),
             np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco])))),
             np.concatenate((self.weights_pull[self.pass_reco], np.ones(len(self.mc_gen[self.pass_reco])))),
-            i,self.model1b,stepn=1 # TODO implement model1b, stepn=1.5??
+            i,self.model1b,stepn=1
         )
 
         average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model1b)

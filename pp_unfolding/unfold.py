@@ -15,6 +15,7 @@ from IPython.display import Image
 pd.set_option('display.max_columns', None) # to see all columns of df.head()
 np.set_printoptions(edgeitems=15)
 
+nevts=25e6
 
 hvd.init()
 # Horovod: pin GPU to be used to process local rank (one GPU per process)
@@ -63,7 +64,23 @@ print("synthetic data")
 print(synth_df.tail(10)) #look at some entries
 
 
+# TODO before this, synth_df and natural_df have to be constructed identically across hvd
+
 # ### define 4 main datasets
+
+data_vars = np.concatenate([np.expand_dims(natural_df[var][hvd.rank()::hvd.size()],-1) for var in obs_features],-1)
+
+mc_reco = np.concatenate([np.expand_dims(synth_df[var][hvd.rank():nevts:hvd.size()],-1) for var in obs_features],-1)
+mc_gen = np.concatenate([np.expand_dims(synth_df[var][hvd.rank():nevts:hvd.size()],-1) for var in gen_features],-1) 
+
+
+print(data_vars)
+print(mc_reco)
+print(mc_gen)
+
+exit()
+
+# global vars
 
 theta_unknown_S = natural_df[obs_features].to_numpy() #Reconstructed Data
 theta_unknown_G = natural_df[gen_features].to_numpy() #Nature, which unfolded data approaches
@@ -128,9 +145,9 @@ data_vars = np.concatenate(np.expand_dims(theta_unknown_S[:,i][hvd.rank():ntest:
 """ run to evaluate new data, calculate new weights """
 mfold = Multifold(
         nevts=nevts, #TODO implement nevts somehow
-        mc_gen=theta0_G,
-        mc_reco=theta0_S,
-        data=theta_unknown_S,
+        mc_gen=mc_gen,
+        mc_reco=mc_reco,
+        data=data_vars,
         config_file='config_omnifold.json',
         verbose = 1  
     )
