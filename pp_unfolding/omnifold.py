@@ -129,14 +129,11 @@ def omnifold_tr_eff(theta0,theta_unknown_S,iterations,model,dummyval=-9999):
     theta0_G = theta0[:,0]
     theta0_S = theta0[:,1]
     
-    labels0 = np.zeros(len(theta0))
-    labels_unknown = np.ones(len(theta_unknown_S))
-    
     xvals_1 = np.concatenate((theta0_S, theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))
-    yvals_1 = np.concatenate((labels0, np.ones(len(theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))))
+    yvals_1 = np.concatenate((np.zeros(len(theta0_S)), np.ones(len(theta_unknown_S[theta_unknown_S[:,0]!=dummyval]))))
 
     xvals_2 = np.concatenate((theta0_G, theta0_G))
-    yvals_2 = np.concatenate((labels0, labels_unknown))
+    yvals_2 = np.concatenate((np.zeros(len(theta0_G)), np.ones(len(theta0_G))))
 
     # initial iterative weights are ones
     weights_pull = np.ones(len(theta0_S))

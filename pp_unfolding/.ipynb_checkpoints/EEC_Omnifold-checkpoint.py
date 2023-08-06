@@ -111,6 +111,9 @@ part_pt_smeared = part_pt_df['obs_pt']
 binning = np.linspace(0, 4, 100)
 plt.hist(part_pt, binning, alpha=0.5, label='true')
 plt.hist(part_pt_smeared, binning, alpha=0.5, label='smeared')
+print("part_pt len " + str(len(np.unique(part_pt))))
+print("part pt smeared " + str(len(np.unique(part_pt_smeared))))
+print("ratio " + str(len(np.unique(part_pt_smeared))/len(np.unique(part_pt))))
 plt.legend()
 plt.xlabel('particle pt')
 plt.savefig("part_pt.png")
@@ -174,23 +177,17 @@ obs_thrown = synth_df['obs_thrown'].to_numpy() # binary if pair DOESN'T pass eff
 
 # In[ ]:
 
-
+"""
 N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
-#N_Events = 100000
-
-
-# Synthetic
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
+theta_unknown_S = theta_unknown_S[:N_Events]
+#theta_unknown_G = theta_unknown_G[:N_Events]
+"""
+
+# Synthetic
 
 theta0 = np.stack([theta0_G, theta0_S], axis=1)
-
-# Natural
-theta_unknown_G = theta_unknown_G[:N_Events]
-theta_unknown_S = theta_unknown_S[:N_Events]
-
-
-obs_thrown = obs_thrown[:N_Events]
 
 
 
@@ -261,18 +258,16 @@ model_dis = Model(inputs=inputs, outputs=outputs)
 N_Iterations = 2
 
 """ run to evaluate new data, calculate new weights """
-"""
 myweights = of.omnifold_tr_eff(theta0,theta_unknown_S,N_Iterations,model_dis,dummyval=-9999)
 
 print(myweights)
 print(myweights.shape)
 
-of.save_object(myweights, "./myweights_sigmap2.p")
-"""
+of.save_object(myweights, "./myweights_sigmap2_temp.p")
 
 
 """ run to load in saved weights """
-myweights = of.load_object("./myweights_sigmap2.p")
+# myweights = of.load_object("./myweights_sigmap2.p")
 
 
 # In[ ]:
