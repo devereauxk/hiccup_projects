@@ -1,58 +1,41 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[2]:
-
-
-import sys
+import sys, os
 print(sys.path)
 
 import numpy as np
 import pandas as pd
 import uproot as ur
 
-from keras.layers import Dense, Input
-from keras.models import Model
-
-import omnifold_old as of
-import os
+import omnifold as of
+from omnifold import Multifold
 import tensorflow as tf
+import tensorflow.keras.backend as K
+import horovod.tensorflow.keras as hvd
 
 from matplotlib import pyplot as plt
 from IPython.display import Image
 pd.set_option('display.max_columns', None) # to see all columns of df.head()
-
 np.set_printoptions(edgeitems=15)
 
-dummyval = -9999
 
-
-# In[3]:
-
-
+"""
+hvd.init()
+# Horovod: pin GPU to be used to process local rank (one GPU per process)
 gpus = tf.config.experimental.list_physical_devices('GPU')
 print(gpus)
 print(tf.test.is_built_with_cuda())
 
-# ___
-# ___
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
+if gpus:
+    tf.config.experimental.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
 
-# |   |   |   |
-# |---|---|---|
-# |Synthetic Generator-Level Sim   | $\theta_{0,G}$  | Truth-Level Sim  |
-# |Synthetic Reconstruction-Level Sim   | $\theta_{0,S}$   | Full Reco-Level Sim  |
-# |Natural Reconstruction  | $\theta_\mathrm{unknown,S}$  | Observed Detector Data  |
-# |Natural Truth   |$\theta_\mathrm{unknown,G}$   | Nature  |
-# 
+
+print(80*'#')
+print("Total hvd size {}, rank: {}, local size: {}, local rank: {}".format(hvd.size(), hvd.rank(), hvd.local_size(), hvd.local_rank()))
+print(80*'#')
+"""
 
 # # Omnifold for EEC unfolding, (energy_weight, R_L, jet_pt)
-
-# #### we assume all imported root files consist of `TTree preprocessed` consiting of three columns `energy_weight`, `R_L`, and `jet_pt`
-
-# ### Define variables to unfold
-
-# In[ ]:
-
 
 obs_features = ["obs_energy_weight", "obs_R_L", "obs_jet_pt"]
 gen_features = ["gen_energy_weight", "gen_R_L", "gen_jet_pt"]
@@ -63,9 +46,6 @@ labels = ["energy weight", "$R_L$", "jet $p_T$"]
 # ### Import "natural reco": ALICE measured (testing: PYTHIA8 generator-level)
 # ### Import "natural truth": ALICE truth (testing: PYTHIA8 generator-level, unused during actuall unfolding) 
 
-# In[ ]:
-
-
 natural_file = "preprocess_tr_eff_sigmap2.root"
 natural_tree = ur.open("%s:preprocessed"%(natural_file))
 natural_df = natural_tree.arrays(library="pd") #open the TTree as a pandas data frame
@@ -73,98 +53,25 @@ natural_df = natural_tree.arrays(library="pd") #open the TTree as a pandas data 
 
 # ### Take a quick look at the data
 
-# In[ ]:
-
-
+print("natural data")
 print(natural_df.describe())
-
-
-# In[ ]:
-
-
 print(natural_df.head(10))
 
 
 # ### Import "synthetic simulation", both generated and reconstructed level.
-
-# In[ ]:
-
-
 synthetic_file = "preprocess_tr_eff_cross_ref.root"
 synth_tree = ur.open("%s:preprocessed"%(synthetic_file))
 synth_df = synth_tree.arrays(library="pd")
 
-
-# In[ ]:
-
-
+print("synthetic data")
 print(synth_df.tail(10)) #look at some entries
 
 
-# In[ ]:
-
-
-# particle pt relative error
-part_pt_tree = ur.open("%s:particle_pt"%(natural_file))
-part_pt_df = part_pt_tree.arrays(library="pd")
-part_pt = part_pt_df['gen_pt']
-part_pt_smeared = part_pt_df['obs_pt']
-
-binning = np.linspace(0, 4, 100)
-plt.hist(part_pt, binning, alpha=0.5, label='true')
-plt.hist(part_pt_smeared, binning, alpha=0.5, label='smeared')
-print("part_pt len " + str(len(np.unique(part_pt))))
-print("part pt smeared " + str(len(np.unique(part_pt_smeared))))
-print("ratio " + str(len(np.unique(part_pt_smeared))/len(np.unique(part_pt))))
-plt.legend()
-plt.xlabel('particle pt')
-plt.savefig("part_pt.png")
-plt.close()
-
-binning = np.linspace(-0.05, 0.05, 100)
-plt.hist( (part_pt_smeared - part_pt) / part_pt, binning)
-plt.title('particle pt relative error')
-plt.savefig("part_pt_err.png")
-plt.close()
-
-
-# ### Jet pt resolution
-
-# In[ ]:
-
-
-# jet pt relative error
-jet_pt_tree_nat = ur.open("%s:jet_pt"%(natural_file))
-jet_pt_df_nat = jet_pt_tree_nat.arrays(library="pd")
-jet_pt_nat = jet_pt_df_nat['gen_pt']
-jet_pt_nat_smeared = jet_pt_df_nat['obs_pt']
-
-jet_pt_tree_synth = ur.open("%s:jet_pt"%(synthetic_file))
-jet_pt_df_synth = jet_pt_tree_synth.arrays(library="pd")
-jet_pt_synth = jet_pt_df_synth['gen_pt']
-jet_pt_synth_smeared = jet_pt_df_synth['obs_pt']
-
-binning = np.linspace(20, 40, 100)
-plt.hist(jet_pt_synth,binning,color='blue',alpha=0.5,label="MC, true")
-plt.hist(jet_pt_synth_smeared,binning,histtype="step",color='black',ls=':',label="MC, reco")
-plt.hist(jet_pt_nat,binning,color='orange',alpha=0.5,label="Data, true")
-plt.hist(jet_pt_nat_smeared,binning,histtype="step",color='black',label="Data, reco")
-plt.legend()
-plt.xlabel('jet pt')
-plt.savefig("jet_pt.png")
-plt.close()
-
-binning = np.linspace(-0.2, 0.2, 100)
-plt.hist( (jet_pt_nat_smeared - jet_pt_nat) / jet_pt_nat, binning)
-plt.title('jet pt relative error')
-plt.savefig("jet_pt_err.png")
-plt.close()
-
+# TODO before this, synth_df and natural_df have to be constructed identically across hvd
 
 # ### define 4 main datasets
 
-# In[ ]:
-
+# global vars
 
 theta_unknown_S = natural_df[obs_features].to_numpy() #Reconstructed Data
 theta_unknown_G = natural_df[gen_features].to_numpy() #Nature, which unfolded data approaches
@@ -172,42 +79,36 @@ theta_unknown_G = natural_df[gen_features].to_numpy() #Nature, which unfolded da
 theta0_S = synth_df[obs_features].to_numpy() #Simulated, synthetic reco-level
 theta0_G = synth_df[gen_features].to_numpy() #Generated, synthetic truth-level
 
-obs_thrown = synth_df['obs_thrown'].to_numpy() # binary if pair DOESN'T pass efficiency cut
 
-
-# ### Ensure the samples have the same number of entries
-
-# In[ ]:
-
-
+# limit event size
 N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
-N_Events = 50000
+N_Events = 200000
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
 theta_unknown_S = theta_unknown_S[:int(0.7*N_Events)]
 theta_unknown_G = theta_unknown_G[:int(0.7*N_Events)]
 
-theta0 = np.stack([theta0_G, theta0_S], axis=1)
+nevts = theta0_S.shape[0]
 
 
-""" halfway split of events 
-halfway = round(N_Events / 2)
+# learning sets
 
-# Synthetic
-theta0_G = theta0_G[:halfway]
-theta0_S = theta0_S[:halfway]
+"""
+data_vars = np.concatenate([np.expand_dims(natural_df[var][hvd.rank()::hvd.size()],-1) for var in obs_features],-1)
 
-theta0 = np.stack([theta0_G, theta0_S], axis=1)
+mc_reco = np.concatenate([np.expand_dims(synth_df[var][hvd.rank():nevts:hvd.size()],-1) for var in obs_features],-1)
+mc_gen = np.concatenate([np.expand_dims(synth_df[var][hvd.rank():nevts:hvd.size()],-1) for var in gen_features],-1) 
 
-# Natural
-theta_unknown_G = theta_unknown_G[halfway:N_Events]
-theta_unknown_S = theta_unknown_S[halfway:N_Events]
+print("[HVD] data vars " + str(data_vars.shape))
+print(data_vars)
+print("[HVD] mc reco " + str(mc_reco.shape))
+print(mc_reco)
+print("[HVD] mc gen " + str(mc_gen.shape))
+print(mc_gen)
 """
 
 
-
-# In[ ]:
-
+# produce plots pre-training
 
 N = len(obs_features)
 
@@ -236,41 +137,54 @@ for i,ax in enumerate(axes.ravel()):
     obs_i += 1
     
 fig.tight_layout()
-fig.savefig("pre_training_temp.png")
+fig.savefig("pre_training_unfold_temp.png")
 plt.close()
 
 
-# In[ ]:
+
+# TODO implement some preprocessing
 
 
-inputs = Input((len(obs_features), ))
-hidden_layer_1 = Dense(50, activation='relu')(inputs)
-hidden_layer_2 = Dense(50, activation='relu')(hidden_layer_1)
-hidden_layer_3 = Dense(50, activation='relu')(hidden_layer_2)
-outputs = Dense(1, activation='sigmoid')(hidden_layer_3)
-model_dis = Model(inputs=inputs, outputs=outputs)
+# PERFORM UNFOLDING
 
-
-# In[ ]:
-
-
-N_Iterations = 1
+# |   |   |   |
+# |---|---|---|
+# |Synthetic Generator-Level Sim   | $\theta_{0,G}$  | Truth-Level Sim  |
+# |Synthetic Reconstruction-Level Sim   | $\theta_{0,S}$   | Full Reco-Level Sim  |
+# |Natural Reconstruction  | $\theta_\mathrm{unknown,S}$  | Observed Detector Data  |
+# |Natural Truth   |$\theta_\mathrm{unknown,G}$   | Nature  |
 
 """ run to evaluate new data, calculate new weights """
-myweights = of.omnifold_tr_eff(theta0,theta_unknown_S,N_Iterations,model_dis,dummyval=-9999)
+K.clear_session()
+mfold = Multifold(
+        nevts=nevts,
+        mc_gen=theta0_G,
+        mc_reco=theta0_S,
+        data=theta_unknown_S,
+        config_file='config_omnifold.json',
+        verbose = 1  
+    )
 
-print(myweights)
-print(myweights.shape)
+mfold.Preprocessing(weights_mc=None, weights_data=None)
+mfold.Unfold()
+myweights = mfold.GetWeights()
 
-of.save_object(myweights, "./myweights_sigmap2.p")
+of.save_object(myweights, "./myweights_temp.p")
 
 
 """ run to load in saved weights """
-# myweights = of.load_object("./myweights_sigmap2.p")
+#myweights = of.load_object("./myweights.p")
 
 
-# In[ ]:
+print("multifolded weights")
+print(myweights)
+print(myweights.shape)
 
+
+# print unfolded results for each dimension
+
+
+N_Iterations = 1
 
 binning = [np.logspace(-5,0,100),np.logspace(-4,0,100),np.linspace(20,40,100)]
 
@@ -297,7 +211,7 @@ for iteration in range(N_Iterations):
         obs_i += 1
     
     fig.tight_layout()
-    fig.savefig("post_training_" + str(iteration) + "_temp.png")
+    fig.savefig("post_training_" + str(iteration) + "_unfold_temp.png")
     plt.close()
 
 # ### true vs smeared EEC calculation

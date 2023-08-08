@@ -14,7 +14,7 @@ import uproot as ur
 from keras.layers import Dense, Input
 from keras.models import Model
 
-import omnifold as of
+import omnifold_old as of
 import os
 import tensorflow as tf
 
@@ -23,6 +23,8 @@ from IPython.display import Image
 pd.set_option('display.max_columns', None) # to see all columns of df.head()
 
 np.set_printoptions(edgeitems=15)
+
+dummyval = -9999
 
 
 # In[3]:
@@ -177,18 +179,15 @@ obs_thrown = synth_df['obs_thrown'].to_numpy() # binary if pair DOESN'T pass eff
 
 # In[ ]:
 
-"""
+
 N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
+N_Events = 50000
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
-theta_unknown_S = theta_unknown_S[:N_Events]
-#theta_unknown_G = theta_unknown_G[:N_Events]
-"""
-
-# Synthetic
+theta_unknown_S = theta_unknown_S[:int(0.7*N_Events)]
+theta_unknown_G = theta_unknown_G[:int(0.7*N_Events)]
 
 theta0 = np.stack([theta0_G, theta0_S], axis=1)
-
 
 
 """ halfway split of events 
@@ -237,7 +236,7 @@ for i,ax in enumerate(axes.ravel()):
     obs_i += 1
     
 fig.tight_layout()
-fig.savefig("pre_training.png")
+fig.savefig("pre_training_temp.png")
 plt.close()
 
 
@@ -255,7 +254,7 @@ model_dis = Model(inputs=inputs, outputs=outputs)
 # In[ ]:
 
 
-N_Iterations = 2
+N_Iterations = 1
 
 """ run to evaluate new data, calculate new weights """
 myweights = of.omnifold_tr_eff(theta0,theta_unknown_S,N_Iterations,model_dis,dummyval=-9999)
@@ -263,7 +262,7 @@ myweights = of.omnifold_tr_eff(theta0,theta_unknown_S,N_Iterations,model_dis,dum
 print(myweights)
 print(myweights.shape)
 
-of.save_object(myweights, "./myweights_sigmap2_temp.p")
+of.save_object(myweights, "./myweights_sigmap2.p")
 
 
 """ run to load in saved weights """
@@ -282,7 +281,7 @@ for iteration in range(N_Iterations):
 
     for i,ax in enumerate(axes.ravel()):
         if (i >= N): break
-        _,_,_=ax.hist(theta0_G[:,i],binning[i],color='blue',alpha=0.5,label="MC, true")
+        _,_,_=ax.hist(theta0_G[:,i],binning[i],color='blue', alpha=0.5, label="MC, true")
         _,_,_=ax.hist(theta_unknown_G[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
         _,_,_=ax.hist(theta0_G[:,i],weights=myweights[iteration, 0, :],bins=binning[i],color='black',histtype="step",label="OmniFolded",lw=2)
 
@@ -298,16 +297,10 @@ for iteration in range(N_Iterations):
         obs_i += 1
     
     fig.tight_layout()
-    fig.savefig("post_training_" + str(iteration) + ".png")
+    fig.savefig("post_training_" + str(iteration) + "_temp.png")
     plt.close()
 
-
-# ___
-# ___
-
 # ### true vs smeared EEC calculation
-
-# In[ ]:
 
 plt.clf()
 binning = np.logspace(-4, np.log10(0.4), 100)
@@ -336,9 +329,6 @@ plt.close()
 
 # ### true vs smeared EEC calculation, normalized by number of jets
 
-# In[ ]:
-
-
 # calculate number of jets in each sample
 Njets_theta0_G = len(np.unique(theta0_G[:,2]))
 Njets_theta0_S = len(np.unique(theta0_S[:,2]))
@@ -346,11 +336,11 @@ Njets_theta_unknown_G = len(np.unique(theta_unknown_G[:,2]))
 Njets_theta_unknown_S = len(np.unique(theta_unknown_S[:,2]))
 Njets_unfolded = (Njets_theta0_G / Njets_theta0_S) * Njets_theta_unknown_S
 
-print("number of MC true jets   = " + str(Njets_theta0_G))
-print("number of MC reco jets   = " + str(Njets_theta0_S))
-print("number of Data true jets = " + str(Njets_theta_unknown_G))
-print("ESTIMATED BY ME          = " + str(Njets_unfolded))
-print("number of Data reco jets = " + str(Njets_theta0_S))
+print("number of MC reco jets    = " + str(Njets_theta0_S))
+print("number of MC true jets    = " + str(Njets_theta0_G))
+print("number of Data reco jets  = " + str(Njets_theta0_S))
+print("number of Data truth jets = " + str(Njets_unfolded) + " (ESTIMATED BY ME)")
+
 
 plt.clf()
 binning = np.logspace(-4, np.log10(0.4), 100)
@@ -378,13 +368,13 @@ plt.close()
 N_truth_jets = len(np.unique(theta0_G[:,2]))
 N_det_jets = len(np.unique(theta0_S[:,2]))
 
-print("number of truth jets: " + str(N_truth_jets))
-print("number of det   jets: " + str(N_det_jets))
+print("number of truth sim jets: " + str(N_truth_jets))
+print("number of det sim   jets: " + str(N_det_jets))
 print("percentage = " + str(N_det_jets / N_truth_jets))
 
 N_truth_pairs = len(theta0_G)
 N_det_pairs = len(np.unique(theta0_S[:,0]))
 
-print("number of truth pairs: " + str(N_truth_pairs))
-print("number of det   pairs: " + str(N_det_pairs))
+print("number of truth sim pairs: " + str(N_truth_pairs))
+print("number of det sim   pairs: " + str(N_det_pairs))
 print("percentage = " + str(N_det_pairs / N_truth_pairs))

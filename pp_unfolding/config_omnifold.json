@@ -1,5 +1,5 @@
 {'General': {
-    'NITER': 2,
+    'NITER': 1,
     'LR': 1e-4,
     'BATCH_SIZE': 6250,
     'EPOCHS': 150,
