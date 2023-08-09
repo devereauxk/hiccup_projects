@@ -15,14 +15,8 @@ from dense import MLP
 
 dummyval = -9999
 
-def reweight(events,model,batch_size=10000):
-    f = model.predict(events, batch_size=batch_size)
-    weights = f / (1. - f)
-    return np.squeeze(np.nan_to_num(weights))
-
 # Binary crossentropy for classifying two samples with weights
 # Weights are "hidden" by zipping in y_true (the labels)
-
 def weighted_binary_crossentropy(y_true, y_pred):
     weights = tf.gather(y_true, [1], axis=1) # event weights
     y_true = tf.gather(y_true, [0], axis=1) # actual y_true for loss
@@ -86,7 +80,7 @@ class Multifold():
             os.makedirs(self.weights_folder)
             
     def Unfold(self):
-        # self.CompileModel()
+        self.CompileModel()
         
         for i in range(self.niter):
             print("ITERATION: {}".format(i + 1))            
@@ -100,13 +94,15 @@ class Multifold():
         
         """
         self.RunModel(
-            np.concatenate((self.mc_reco[self.mc_reco[:,0]!=dummyval], self.data[self.data[:,0]!=dummyval])),
-            np.concatenate((np.zeros(len(self.mc_reco[self.mc_reco[:,0]!=dummyval])), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
-            np.concatenate((self.weights_push[self.mc_reco[:,0]!=dummyval],self.weights_data)),
+            np.concatenate((self.mc_reco, self.data[self.data[:,0]!=dummyval])),
+            np.concatenate((np.zeros(len(self.mc_reco)), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
+            np.concatenate((self.weights_push, np.ones(len(self.data[self.data[:,0]!=dummyval])))),
             i,self.model1,stepn=1
         )
-        """
         
+        self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model1)
+        
+        """
         xvals_1 = np.concatenate((self.mc_reco, self.data[self.data[:,0]!=dummyval]))
         yvals_1 = np.concatenate((np.zeros(len(self.mc_reco)), np.ones(len(self.data[self.data[:,0]!=dummyval]))))
         weights_1 = np.concatenate((self.weights_push, np.ones(len(self.data[self.data[:,0]!=dummyval]))))
@@ -114,10 +110,13 @@ class Multifold():
         X_train_1, X_test_1, Y_train_1, Y_test_1, w_train_1, w_test_1 = train_test_split(
             xvals_1, yvals_1, weights_1) #REMINDER: made up of synthetic+measured
         
-        self.model.compile(loss='binary_crossentropy',
-            optimizer='Adam',
-            metrics=['accuracy'],
-            weighted_metrics=[])
+        verbose = 2 if hvd.rank()==0 else 0
+        callbacks = [
+            hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+            hvd.callbacks.MetricAverageCallback(),
+            ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
+            EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
+        ]
         
         self.model.fit(X_train_1[X_train_1[:,0]!=dummyval],
                 Y_train_1[X_train_1[:,0]!=dummyval],
@@ -125,9 +124,11 @@ class Multifold():
                 epochs=20,
                 batch_size=2000,
                 validation_data=(X_test_1[X_test_1[:,0]!=dummyval], Y_test_1[X_test_1[:,0]!=dummyval], w_test_1[X_test_1[:,0]!=dummyval]),
-                verbose=1)
-        
+                callbacks=callbacks,
+                verbose=verbose)
+                
         self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model)
+
 
         # STEP 1B: Need to do something with events that don't pass reco.
         # one option is to simply do:
@@ -142,8 +143,11 @@ class Multifold():
             np.concatenate((self.weights_pull[self.pass_reco], np.ones(len(self.mc_gen[self.pass_reco])))),
             i,self.model1b,stepn=1.5
         )
-        """
         
+        average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model1b)
+        self.weights_pull[self.not_pass_reco] = average_vals
+        
+        """
         xvals_1b = np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco]))
         yvals_1b = np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco]))))
         weights_1b = np.concatenate((self.weights_pull[self.pass_reco], np.ones(len(self.mc_gen[self.pass_reco]))))
@@ -151,20 +155,24 @@ class Multifold():
         X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
             xvals_1b, yvals_1b, weights_1b)
         
-        self.model.compile(loss='binary_crossentropy',
-                    optimizer='Adam',
-                    metrics=['accuracy'],
-                    weighted_metrics=[])
+        callbacks = [
+            hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+            hvd.callbacks.MetricAverageCallback(),
+            ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
+            EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
+        ]
         self.model.fit(X_train_1b,
                 Y_train_1b,
                 sample_weight=w_train_1b,
                 epochs=20,
                 batch_size=10000,
                 validation_data=(X_test_1b, Y_test_1b, w_test_1b),
-                verbose=1)
-
+                callbacks=callbacks,
+                verbose=verbose)
+                
         average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model)
         self.weights_pull[self.not_pass_reco] = average_vals #TODO confirm this line works as intended
+        
 
         # end of STEP 1B
         
@@ -180,29 +188,37 @@ class Multifold():
             np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen)))),
             np.concatenate((np.ones(len(self.mc_gen)), self.weights_pull)),
             i,self.model2,stepn=2
-        )"""
+        )
         
+        new_weights=self.reweight(self.mc_gen,self.model2)
+        
+        """
         xvals_2 = np.concatenate((self.mc_gen, self.mc_gen))
         yvals_2 = np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen))))
         weights_2 = np.concatenate((np.ones(len(self.mc_gen)), self.weights_pull))
         
         X_train_2, X_test_2, Y_train_2, Y_test_2, w_train_2, w_test_2 = train_test_split(
             xvals_2, yvals_2, weights_2)
-
-        self.model.compile(loss='binary_crossentropy',
-                    optimizer='Adam',
-                    metrics=['accuracy'],
-                    weighted_metrics=[])
+        
+        verbose = 2 if hvd.rank()==0 else 0
+        callbacks = [
+            hvd.callbacks.BroadcastGlobalVariablesCallback(0),
+            hvd.callbacks.MetricAverageCallback(),
+            ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
+            EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
+        ]
         self.model.fit(X_train_2,
                 Y_train_2,
                 sample_weight=w_train_2,
                 epochs=20,
                 batch_size=2000,
                 validation_data=(X_test_2, Y_test_2, w_test_2),
-                verbose=1)
+                callbacks=callbacks,
+                verbose=verbose)
 
         new_weights=self.reweight(self.mc_gen,self.model)
-
+        
+        
         new_weights[self.not_pass_gen]=1.0
         self.weights_push = new_weights
         self.weights[i, 1:2, :] = self.weights_push
@@ -219,23 +235,22 @@ class Multifold():
         ).cache().shuffle(np.sum(mask))
         """
         
-        # assume sample,labels,weights already deals with events that dont pass reco
+        # IMPORTANT: assume sample,labels,weights already deals with events that dont pass reco/gen
+        shuffle_size = sample.shape[0] # if slow, change to shuffle_size to a number larger than self.BATCH_SIZE>
         data = tf.data.Dataset.from_tensor_slices((
             sample,
             np.stack((labels,weights),axis=1))
-        ).cache().shuffle(sample.shape[0])
+        ).cache().shuffle(shuffle_size) 
 
         #Fix same number of training events between ranks
         NTRAIN,NTEST = self.GetNtrainNtest(stepn)        
         test_data = data.take(NTEST).repeat().batch(self.BATCH_SIZE)
         train_data = data.skip(NTEST).repeat().batch(self.BATCH_SIZE)
 
-        """
         if self.verbose:
             print(80*'#')
-            print("Train events used: {}, total number of train events: {}, percentage: {}".format(NTRAIN,np.sum(mask)*0.8, np.sum(mask)*0.8/NTRAIN))
+            print("Train events used: {}, total number of train events: {}, percentage: {}".format(NTRAIN,int(np.sum(shuffle_size)*0.8), NTRAIN/(np.sum(shuffle_size)*0.8)))
             print(80*'#')
-        """
 
         verbose = 2 if hvd.rank() == 0 else 0
         
@@ -268,7 +283,6 @@ class Multifold():
 
     def Preprocessing(self,weights_mc=None,weights_data=None):
         self.PrepareWeights(weights_mc,weights_data)
-        self.PrepareInputs()
         self.PrepareModel()
 
     def PrepareWeights(self,weights_mc,weights_data):
@@ -289,14 +303,8 @@ class Multifold():
         self.weights_pull = np.ones(len(self.weights_mc))
         self.weights_push = np.ones(len(self.weights_mc))
 
-    def PrepareInputs(self):
-        self.labels_mc = np.zeros(len(self.mc_reco))
-        self.labels_data = np.ones(len(self.data[self.data[:,0]!=dummyval]))
-        self.labels_gen = np.ones(len(self.mc_gen))
-
     def PrepareModel(self):
         nvars = self.mc_gen.shape[1]
-        """
         inputs1,outputs1 = MLP(nvars,self.opt['MLP']['NTRIAL'])
         inputs1b,outputs1b = MLP(nvars,self.opt['MLP']['NTRIAL'])
         inputs2,outputs2 = MLP(nvars,self.opt['MLP']['NTRIAL'])
@@ -304,7 +312,6 @@ class Multifold():
         self.model1 = Model(inputs=inputs1, outputs=outputs1)
         self.model1b = Model(inputs=inputs1b, outputs=outputs1b)
         self.model2 = Model(inputs=inputs2, outputs=outputs2)
-        """
         
         inputs = Input((nvars, ))
         hidden_layer_1 = Dense(50, activation='relu')(inputs)
@@ -327,11 +334,17 @@ class Multifold():
 
         self.model2.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
+
+        self.model.compile(loss='binary_crossentropy',
+                           optimizer=opt,
+                           metrics=['accuracy'],
+                           weighted_metrics=[])
         
 
-    def GetNtrainNtest(self,stepn): #TODO understand this
+    def GetNtrainNtest(self,stepn):
         if stepn ==1:
-            #about 20% acceptance for reco events
+            # TODO optimize this
+            # use only ~15% of data for step=1 (reco events)
             NTRAIN=int(0.2*0.8*self.nevts/hvd.size())
             NTEST=int(0.2*0.2*self.nevts/hvd.size())                        
         else:

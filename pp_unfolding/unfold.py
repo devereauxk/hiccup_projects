@@ -1,3 +1,6 @@
+# usage:
+# horovodrun --gloo -np 4 -H localhost:4 python unfold.py
+
 import sys, os
 print(sys.path)
 
@@ -14,10 +17,9 @@ import horovod.tensorflow.keras as hvd
 from matplotlib import pyplot as plt
 from IPython.display import Image
 pd.set_option('display.max_columns', None) # to see all columns of df.head()
-np.set_printoptions(edgeitems=15)
+np.set_printoptions(edgeitems=7) 
 
 
-"""
 hvd.init()
 # Horovod: pin GPU to be used to process local rank (one GPU per process)
 gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -31,9 +33,11 @@ if gpus:
 
 
 print(80*'#')
-print("Total hvd size {}, rank: {}, local size: {}, local rank: {}".format(hvd.size(), hvd.rank(), hvd.local_size(), hvd.local_rank()))
+print("Total hvd size: {}, rank: {}, local size: {}, local rank: {}".format(hvd.size(), hvd.rank(), hvd.local_size(), hvd.local_rank()))
 print(80*'#')
-"""
+
+verbose = 2 if hvd.rank() == 0 else 0
+
 
 # # Omnifold for EEC unfolding, (energy_weight, R_L, jet_pt)
 
@@ -53,9 +57,10 @@ natural_df = natural_tree.arrays(library="pd") #open the TTree as a pandas data 
 
 # ### Take a quick look at the data
 
-print("natural data")
-print(natural_df.describe())
-print(natural_df.head(10))
+if verbose > 1:
+    print("natural data")
+    print(natural_df.describe())
+    print(natural_df.head(10))
 
 
 # ### Import "synthetic simulation", both generated and reconstructed level.
@@ -63,8 +68,9 @@ synthetic_file = "preprocess_tr_eff_cross_ref.root"
 synth_tree = ur.open("%s:preprocessed"%(synthetic_file))
 synth_df = synth_tree.arrays(library="pd")
 
-print("synthetic data")
-print(synth_df.tail(10)) #look at some entries
+if verbose > 1:
+    print("synthetic data")
+    print(synth_df.tail(10)) #look at some entries
 
 
 # TODO before this, synth_df and natural_df have to be constructed identically across hvd
@@ -81,31 +87,30 @@ theta0_G = synth_df[gen_features].to_numpy() #Generated, synthetic truth-level
 
 
 # limit event size
-N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
+# NOTE: using too low a number of events will yeild noisy/poor unfolding
+# N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
+"""
 N_Events = 200000
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
 theta_unknown_S = theta_unknown_S[:int(0.7*N_Events)]
 theta_unknown_G = theta_unknown_G[:int(0.7*N_Events)]
+"""
 
 nevts = theta0_S.shape[0]
 
 
-# learning sets
+# learning sets partitions for horovod usage
+data_vars = theta_unknown_S[hvd.rank()::hvd.size()]
+mc_reco = theta0_S[hvd.rank():nevts:hvd.size()]
+mc_gen = theta0_G[hvd.rank():nevts:hvd.size()]
 
-"""
-data_vars = np.concatenate([np.expand_dims(natural_df[var][hvd.rank()::hvd.size()],-1) for var in obs_features],-1)
-
-mc_reco = np.concatenate([np.expand_dims(synth_df[var][hvd.rank():nevts:hvd.size()],-1) for var in obs_features],-1)
-mc_gen = np.concatenate([np.expand_dims(synth_df[var][hvd.rank():nevts:hvd.size()],-1) for var in gen_features],-1) 
-
-print("[HVD] data vars " + str(data_vars.shape))
+print("HVD data vars " + str(data_vars.shape))
 print(data_vars)
-print("[HVD] mc reco " + str(mc_reco.shape))
+print("HVD mc reco " + str(mc_reco.shape))
 print(mc_reco)
-print("[HVD] mc gen " + str(mc_gen.shape))
+print("HVD mc gen " + str(mc_gen.shape))
 print(mc_gen)
-"""
 
 
 # produce plots pre-training
@@ -137,7 +142,7 @@ for i,ax in enumerate(axes.ravel()):
     obs_i += 1
     
 fig.tight_layout()
-fig.savefig("pre_training_unfold_temp.png")
+fig.savefig("pre_training.png")
 plt.close()
 
 
@@ -147,7 +152,6 @@ plt.close()
 
 # PERFORM UNFOLDING
 
-# |   |   |   |
 # |---|---|---|
 # |Synthetic Generator-Level Sim   | $\theta_{0,G}$  | Truth-Level Sim  |
 # |Synthetic Reconstruction-Level Sim   | $\theta_{0,S}$   | Full Reco-Level Sim  |
@@ -169,7 +173,7 @@ mfold.Preprocessing(weights_mc=None, weights_data=None)
 mfold.Unfold()
 myweights = mfold.GetWeights()
 
-of.save_object(myweights, "./myweights_temp.p")
+of.save_object(myweights, "./myweights_old.p")
 
 
 """ run to load in saved weights """
@@ -211,7 +215,7 @@ for iteration in range(N_Iterations):
         obs_i += 1
     
     fig.tight_layout()
-    fig.savefig("post_training_" + str(iteration) + "_unfold_temp.png")
+    fig.savefig("post_training_" + str(iteration) + "_old.png")
     plt.close()
 
 # ### true vs smeared EEC calculation

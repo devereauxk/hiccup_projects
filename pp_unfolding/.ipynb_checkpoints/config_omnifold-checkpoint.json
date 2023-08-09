@@ -1,7 +1,7 @@
 {"General": {
-    "NITER": 4,
+    "NITER": 1,
     "LR": 1e-4,
-    "BATCH_SIZE": 20000,
+    "BATCH_SIZE": 6250,
     "EPOCHS": 150,
     "NWARMUP": 5,
     "NPATIENCE": 10
