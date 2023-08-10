@@ -92,43 +92,13 @@ class Multifold():
         '''Data versus reco MC reweighting'''
         print("RUNNING STEP 1")
         
-        """
-        self.RunModel(
-            np.concatenate((self.mc_reco, self.data[self.data[:,0]!=dummyval])),
-            np.concatenate((np.zeros(len(self.mc_reco)), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
-            np.concatenate((self.weights_push, np.ones(len(self.data[self.data[:,0]!=dummyval])))),
-            i,self.model1,stepn=1
+        self.RunModel_Old(
+            np.concatenate((self.mc_reco[self.pass_reco], self.data[self.data[:,0]!=dummyval])),
+            np.concatenate((np.zeros(len(self.mc_reco[self.pass_reco])), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
+            np.concatenate((self.weights_push[self.pass_reco], np.ones(len(self.data[self.data[:,0]!=dummyval]))))
         )
-        
-        self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model1)
-        
-        """
-        xvals_1 = np.concatenate((self.mc_reco, self.data[self.data[:,0]!=dummyval]))
-        yvals_1 = np.concatenate((np.zeros(len(self.mc_reco)), np.ones(len(self.data[self.data[:,0]!=dummyval]))))
-        weights_1 = np.concatenate((self.weights_push, np.ones(len(self.data[self.data[:,0]!=dummyval]))))
-        
-        X_train_1, X_test_1, Y_train_1, Y_test_1, w_train_1, w_test_1 = train_test_split(
-            xvals_1, yvals_1, weights_1) #REMINDER: made up of synthetic+measured
-        
-        verbose = 2 if hvd.rank()==0 else 0
-        callbacks = [
-            hvd.callbacks.BroadcastGlobalVariablesCallback(0),
-            hvd.callbacks.MetricAverageCallback(),
-            ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
-            EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
-        ]
-        
-        self.model.fit(X_train_1[X_train_1[:,0]!=dummyval],
-                Y_train_1[X_train_1[:,0]!=dummyval],
-                sample_weight=pd.Series(w_train_1[X_train_1[:,0]!=dummyval]),
-                epochs=20,
-                batch_size=2000,
-                validation_data=(X_test_1[X_test_1[:,0]!=dummyval], Y_test_1[X_test_1[:,0]!=dummyval], w_test_1[X_test_1[:,0]!=dummyval]),
-                callbacks=callbacks,
-                verbose=verbose)
                 
         self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model)
-
 
         # STEP 1B: Need to do something with events that don't pass reco.
         # one option is to simply do:
@@ -136,69 +106,56 @@ class Multifold():
         # Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
         print("RUNNING STEP 1B")
         
-        """
-        self.RunModel(
+        self.RunModel_Old(
             np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco])),
             np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco])))),
-            np.concatenate((self.weights_pull[self.pass_reco], np.ones(len(self.mc_gen[self.pass_reco])))),
-            i,self.model1b,stepn=1.5
+            np.concatenate((self.weights_pull[self.pass_reco], np.ones(len(self.mc_gen[self.pass_reco]))))
         )
         
-        average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model1b)
-        self.weights_pull[self.not_pass_reco] = average_vals
-        
-        """
-        xvals_1b = np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco]))
-        yvals_1b = np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco]))))
-        weights_1b = np.concatenate((self.weights_pull[self.pass_reco], np.ones(len(self.mc_gen[self.pass_reco]))))
-        
-        X_train_1b, X_test_1b, Y_train_1b, Y_test_1b, w_train_1b, w_test_1b = train_test_split(
-            xvals_1b, yvals_1b, weights_1b)
-        
-        callbacks = [
-            hvd.callbacks.BroadcastGlobalVariablesCallback(0),
-            hvd.callbacks.MetricAverageCallback(),
-            ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
-            EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
-        ]
-        self.model.fit(X_train_1b,
-                Y_train_1b,
-                sample_weight=w_train_1b,
-                epochs=20,
-                batch_size=10000,
-                validation_data=(X_test_1b, Y_test_1b, w_test_1b),
-                callbacks=callbacks,
-                verbose=verbose)
-                
         average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model)
-        self.weights_pull[self.not_pass_reco] = average_vals #TODO confirm this line works as intended
-        
-
+        self.weights_pull[self.not_pass_reco] = average_vals
         # end of STEP 1B
         
         self.weights[i, :1, :] = self.weights_pull
 
+        
     def RunStep2(self,i):
         '''Gen to Gen reweighing'''        
         print("RUNNING STEP 2")
         
-        """
-        self.RunModel(
+        self.RunModel_Old(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen)))),
-            np.concatenate((np.ones(len(self.mc_gen)), self.weights_pull)),
-            i,self.model2,stepn=2
+            np.concatenate((np.ones(len(self.mc_gen)), self.weights_pull))
         )
         
-        new_weights=self.reweight(self.mc_gen,self.model2)
+        new_weights=self.reweight(self.mc_gen,self.model)
         
-        """
-        xvals_2 = np.concatenate((self.mc_gen, self.mc_gen))
-        yvals_2 = np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen))))
-        weights_2 = np.concatenate((np.ones(len(self.mc_gen)), self.weights_pull))
+        new_weights[self.not_pass_gen]=1.0
+        self.weights_push = new_weights
+        self.weights[i, 1:2, :] = self.weights_push
         
-        X_train_2, X_test_2, Y_train_2, Y_test_2, w_train_2, w_test_2 = train_test_split(
-            xvals_2, yvals_2, weights_2)
+        
+        
+    def RunModel_Old(self,xvals,yvals,weights):
+        
+        #X_train, X_test, Y_train, Y_test, w_train, w_test = train_test_split(xvals, yvals, weights)
+        
+        # assumes inputs contain the exact intended inputs for the model regardless of whether or not they pass
+        # reco or not
+        
+        # IMPORTANT: assume sample,labels,weights already deals with events that dont pass reco/gen
+        # if slow, change to shuffle_size to a number larger than self.BATCH_SIZE>
+        shuffle_size = xvals.shape[0]
+        data = tf.data.Dataset.from_tensor_slices((
+            xvals,
+            np.stack((yvals,weights),axis=1))
+        ).cache().shuffle(shuffle_size)
+        
+        #Fix same number of training events between ranks
+        NTRAIN,NTEST = self.GetNtrainNtest(None)        
+        test_data = data.take(NTEST).repeat().batch(self.BATCH_SIZE)
+        train_data = data.skip(NTEST).repeat().batch(self.BATCH_SIZE)
         
         verbose = 2 if hvd.rank()==0 else 0
         callbacks = [
@@ -207,23 +164,17 @@ class Multifold():
             ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
             EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
         ]
-        self.model.fit(X_train_2,
-                Y_train_2,
-                sample_weight=w_train_2,
-                epochs=20,
-                batch_size=2000,
-                validation_data=(X_test_2, Y_test_2, w_test_2),
+        self.model.fit(
+                train_data,
+                epochs=self.EPOCHS,
+                steps_per_epoch=int(NTRAIN/self.BATCH_SIZE),
+                validation_data=test_data,
+                validation_steps=int(NTEST/self.BATCH_SIZE),
                 callbacks=callbacks,
                 verbose=verbose)
-
-        new_weights=self.reweight(self.mc_gen,self.model)
         
-        
-        new_weights[self.not_pass_gen]=1.0
-        self.weights_push = new_weights
-        self.weights[i, 1:2, :] = self.weights_push
 
-    def RunModel(self,sample,labels,weights,iteration,model,stepn):
+    def RunModel_New(self,sample,labels,weights,iteration,model,stepn):
         
         # remove automatically events that don't pass reco or truth
         """
@@ -265,7 +216,6 @@ class Multifold():
         ]
         
         base_name = "Omnifold"
-        
         if hvd.rank() ==0:
             callbacks.append(
                 ModelCheckpoint('{}/{}_iter{}_step{}.h5'.format(self.weights_folder,base_name,iteration,stepn),
@@ -313,7 +263,7 @@ class Multifold():
         self.model1b = Model(inputs=inputs1b, outputs=outputs1b)
         self.model2 = Model(inputs=inputs2, outputs=outputs2)
         
-        inputs = Input((nvars, ))
+        inputs = Input(self.mc_gen[0].shape)
         hidden_layer_1 = Dense(50, activation='relu')(inputs)
         hidden_layer_2 = Dense(50, activation='relu')(hidden_layer_1)
         hidden_layer_3 = Dense(50, activation='relu')(hidden_layer_2)
@@ -334,19 +284,24 @@ class Multifold():
 
         self.model2.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
-
+        
+        """ THIS DOENOT WORK, SOMETHING WRONG WITH the weighted_binary_crossentropy """
+        self.model.compile(loss=weighted_binary_crossentropy,
+                            optimizer=opt,experimental_run_tf_function=False)
+                            
+        """
         self.model.compile(loss='binary_crossentropy',
                            optimizer=opt,
                            metrics=['accuracy'],
                            weighted_metrics=[])
-        
+                           """
 
     def GetNtrainNtest(self,stepn):
-        if stepn ==1:
+        if stepn == 1:
             # TODO optimize this
             # use only ~15% of data for step=1 (reco events)
-            NTRAIN=int(0.2*0.8*self.nevts/hvd.size())
-            NTEST=int(0.2*0.2*self.nevts/hvd.size())                        
+            NTRAIN=int(0.8*self.nevts/hvd.size())
+            NTEST=int(0.2*self.nevts/hvd.size())                        
         else:
             NTRAIN=int(0.8*self.nevts/hvd.size())
             NTEST=int(0.2*self.nevts/hvd.size())                        
