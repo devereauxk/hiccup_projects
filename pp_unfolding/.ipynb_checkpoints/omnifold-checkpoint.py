@@ -6,15 +6,47 @@ import tensorflow.keras.backend as K
 from tensorflow.keras.models import Model
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, ReduceLROnPlateau
 from sklearn.model_selection import train_test_split
-from keras.layers import Dense, Input
+from keras.layers import Dense, Input, Flatten
 from keras.models import Model
 import pickle
 import yaml, json
 import horovod.tensorflow.keras as hvd
 from dense import MLP
 
-dummyval = -9999
+dummyval = -1
 
+def split_by_index(arr, index):
+    # arr is array with EEC pair information in each row
+    # the output is arr split into different arrays
+    # each one for a unique occuarnce in the specifiecd index column
+    output = []
+    this_jet = []
+    this_jet_pt = arr[0][index]
+    for row in arr:
+        if row[index] == this_jet_pt:
+            this_jet.append(row)
+        else:
+            output.append(np.array(this_jet))
+            this_jet = [row]
+            this_jet_pt = row[index]
+    return np.array(output, dtype=object)
+
+def pad_out_splits(arr,dummyval=-10,pad_length=511):
+    # subarrays with length < pad_legnth are padded with dummyval
+    # subarrays with length > pad_length are removed from the set
+    output = []
+    for subset in arr:
+        if subset.shape[0] > pad_length:
+            continue
+        
+        dummy_part = dummyval * np.ones((pad_length - subset.shape[0], subset.shape[1]))
+        
+        subset = np.vstack([subset, dummy_part])
+        output.append(subset)
+        
+    return np.array(output)
+    
+        
 # Binary crossentropy for classifying two samples with weights
 # Weights are "hidden" by zipping in y_true (the labels)
 def weighted_binary_crossentropy(y_true, y_pred):
@@ -93,9 +125,9 @@ class Multifold():
         print("RUNNING STEP 1")
         
         self.RunModel_New(
-            np.concatenate((self.mc_reco[self.pass_reco], self.data[self.data[:,0]!=dummyval])),
-            np.concatenate((np.zeros(len(self.mc_reco[self.pass_reco])), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
-            np.concatenate((self.weights_push[self.pass_reco], np.ones(len(self.data[self.data[:,0]!=dummyval])))),
+            np.concatenate((self.mc_reco[self.mc_pass_reco], self.data[self.data_pass_reco])),
+            np.concatenate((np.zeros(len(self.mc_reco[self.mc_pass_reco])), np.ones(len(self.data[self.data_pass_reco])))),
+            np.concatenate((self.weights_push[self.mc_pass_reco], np.ones(len(self.data[self.data_pass_reco])))),
             i, self.model1, 1
         )
                 
@@ -103,13 +135,14 @@ class Multifold():
         
         """
         self.RunModel_Old(
-            np.concatenate((self.mc_reco[self.pass_reco], self.data[self.data[:,0]!=dummyval])),
-            np.concatenate((np.zeros(len(self.mc_reco[self.pass_reco])), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
-            np.concatenate((self.weights_push[self.pass_reco], np.ones(len(self.data[self.data[:,0]!=dummyval]))))
+            np.concatenate((self.mc_reco[self.mc_pass_reco], self.data[self.data_pass_reco])),
+            np.concatenate((np.zeros(len(self.mc_reco[self.mc_pass_reco])), np.ones(len(self.data[self.data_pass_reco])))),
+            np.concatenate((self.weights_push[self.mc_pass_reco], np.ones(len(self.data[self.data_pass_reco]))))
         )
                 
         self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model)
         """
+        
 
         # STEP 1B: Need to do something with events that don't pass reco.
         # one option is to simply do:
@@ -118,25 +151,26 @@ class Multifold():
         print("RUNNING STEP 1B")
         
         self.RunModel_New(
-            np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco])),
-            np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco])))),
-            np.concatenate((self.weights_pull[self.pass_reco]*self.weights_mc, np.ones(len(self.mc_gen[self.pass_reco])))),
+            np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
+            np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
+            np.concatenate((self.weights_pull[self.mc_pass_reco]*self.weights_mc[self.mc_pass_reco], np.ones(len(self.mc_gen[self.mc_pass_reco])))),
             i, self.model1b, 1.5
         )
         
-        average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model1b)
-        self.weights_pull[self.not_pass_reco] = average_vals
+        average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model1b)
+        self.weights_pull[self.not_mc_pass_reco] = average_vals
         
         """
         self.RunModel_Old(
-            np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco])),
-            np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco])))),
-            np.concatenate((self.weights_pull[self.pass_reco], np.ones(len(self.mc_gen[self.pass_reco]))))
+            np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
+            np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
+            np.concatenate((self.weights_pull[self.mc_pass_reco], np.ones(len(self.mc_gen[self.mc_pass_reco]))))
         )
         
-        average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model)
-        self.weights_pull[self.not_pass_reco] = average_vals
+        average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model)
+        self.weights_pull[self.not_mc_pass_reco] = average_vals
         """
+        
         
         # end of STEP 1B
         
@@ -147,16 +181,17 @@ class Multifold():
         '''Gen to Gen reweighing'''        
         print("RUNNING STEP 2")
         
+        
         self.RunModel_New(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen)))),
-            np.concatenate((self.mc_weights, self.mc_weights*self.weights_pull)),
+            np.concatenate((self.weights_mc, self.weights_mc*self.weights_pull)),
             i, self.model2, 2
         )
         
         new_weights=self.reweight(self.mc_gen,self.model2)
-        
         """
+        
         self.RunModel_Old(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen)))),
@@ -173,9 +208,6 @@ class Multifold():
         
         
     def RunModel_Old(self,xvals,yvals,weights):
-        
-        #X_train, X_test, Y_train, Y_test, w_train, w_test = train_test_split(xvals, yvals, weights)
-        
         # assumes inputs contain the exact intended inputs for the model regardless of whether or not they pass
         # reco or not
         
@@ -184,8 +216,9 @@ class Multifold():
         shuffle_size = xvals.shape[0]
         data = tf.data.Dataset.from_tensor_slices((
             xvals,
-            np.stack((yvals,weights),axis=1))
-        ).cache().shuffle(shuffle_size)
+            yvals,
+            weights
+        )).cache().shuffle(shuffle_size)
         
         #Fix same number of training events between ranks
         NTRAIN,NTEST = self.GetNtrainNtest(None)        
@@ -199,6 +232,14 @@ class Multifold():
             ReduceLROnPlateau(patience=8, min_lr=1e-7,verbose=verbose),
             EarlyStopping(patience=self.opt['General']['NPATIENCE'],restore_best_weights=True)
         ]
+        """
+        data_iterator = train_data.as_numpy_iterator()
+        print(80*'#')
+        print("DATA")
+        x_batch, y_batch, weights_batch = next(data_iterator)
+        print(f"Batch {0 + 1}: x_batch.shape = {x_batch.shape}, y_batch.shape = {y_batch.shape}, weights_batch.shape = {weights_batch.shape}")
+        """
+        
         self.model.fit(
                 train_data,
                 epochs=self.EPOCHS,
@@ -226,7 +267,7 @@ class Multifold():
         data = tf.data.Dataset.from_tensor_slices((
             sample,
             np.stack((labels,weights),axis=1))
-        ).cache().shuffle(shuffle_size) 
+        ).cache().shuffle(shuffle_size)
 
         #Fix same number of training events between ranks
         NTRAIN,NTEST = self.GetNtrainNtest(stepn)        
@@ -271,9 +312,16 @@ class Multifold():
         self.PrepareModel()
 
     def PrepareWeights(self,weights_mc,weights_data):
-        self.pass_reco = self.mc_reco[:,0]!=dummyval
-        self.not_pass_reco = self.mc_reco[:,0]==dummyval
-        self.not_pass_gen = self.mc_gen[:,0]==dummyval
+        if len(self.mc_reco.shape) == 3: # input is 3D i.e. either jet or event level
+            self.mc_pass_reco = self.mc_reco[:,0,0]!=dummyval
+            self.not_mc_pass_reco = self.mc_reco[:,0,0]==dummyval
+            self.data_pass_reco = self.data[:,0,0]!=dummyval
+            self.not_pass_gen = self.mc_gen[:,0,0]==dummyval
+        else: # assume input is 2D; i.e. pair level
+            self.mc_pass_reco = self.mc_reco[:,0]!=dummyval
+            self.not_mc_pass_reco = self.mc_reco[:,0]==dummyval
+            self.data_pass_reco = self.data[:,0]!=dummyval
+            self.not_pass_gen = self.mc_gen[:,0]==dummyval
         
         if weights_mc is None:
             self.weights_mc = np.ones(self.mc_reco.shape[0])
@@ -281,7 +329,7 @@ class Multifold():
             self.weights_mc = weights_mc
 
         if weights_data is None:
-            self.weights_data = np.ones(self.data[self.data[:,0]!=dummyval].shape[0])
+            self.weights_data = np.ones(self.data[self.data_pass_reco].shape[0])
         else:
             self.weights_data =weights_data
             
@@ -289,20 +337,22 @@ class Multifold():
         self.weights_push = np.ones(len(self.weights_mc))
 
     def PrepareModel(self):
-        nvars = self.mc_gen.shape[1]
-        inputs1,outputs1 = MLP(nvars,self.opt['MLP']['NTRIAL'])
-        inputs1b,outputs1b = MLP(nvars,self.opt['MLP']['NTRIAL'])
-        inputs2,outputs2 = MLP(nvars,self.opt['MLP']['NTRIAL'])
+        input_shape = self.mc_gen.shape[1:]
+        inputs1,outputs1 = MLP(input_shape,self.opt['MLP']['NTRIAL'])
+        inputs1b,outputs1b = MLP(input_shape,self.opt['MLP']['NTRIAL'])
+        inputs2,outputs2 = MLP(input_shape,self.opt['MLP']['NTRIAL'])
             
         self.model1 = Model(inputs=inputs1, outputs=outputs1)
         self.model1b = Model(inputs=inputs1b, outputs=outputs1b)
         self.model2 = Model(inputs=inputs2, outputs=outputs2)
         
-        inputs = Input(self.mc_gen[0].shape)
+        print("model input shape : " + str(self.mc_gen.shape[1:]))
+        inputs = Input(self.mc_gen.shape[1:])
         hidden_layer_1 = Dense(50, activation='relu')(inputs)
         hidden_layer_2 = Dense(50, activation='relu')(hidden_layer_1)
         hidden_layer_3 = Dense(50, activation='relu')(hidden_layer_2)
-        outputs = Dense(1, activation='sigmoid')(hidden_layer_3)
+        hidden_layer_flat = Flatten()(hidden_layer_2)
+        outputs = Dense(1, activation='sigmoid')(hidden_layer_flat)
         self.model = Model(inputs=inputs, outputs=outputs)
 
     def CompileModel(self):
@@ -323,10 +373,13 @@ class Multifold():
         # setting up the model like this ONLY works with the format of model.fit used in RunModel
         # i.e. not in the way used in the preliminary studies
         self.model.compile(loss=weighted_binary_crossentropy,
-                            optimizer=opt,experimental_run_tf_function=False)
+                            optimizer=opt,experimental_run_tf_function=False,
+                            weighted_metrics=[])
+        self.model.summary()
                             
 
     def GetNtrainNtest(self,stepn):
+        # CHANGING THESE PARAMETERS CAN CHANGE FIT DRASTICALLY
         if stepn == 1:
             # TODO optimize this
             # use only ~15% of data for step=1 (reco events)

@@ -17,7 +17,7 @@ import horovod.tensorflow.keras as hvd
 from matplotlib import pyplot as plt
 from IPython.display import Image
 pd.set_option('display.max_columns', None) # to see all columns of df.head()
-np.set_printoptions(edgeitems=7) 
+np.set_printoptions(edgeitems=2) 
 
 
 hvd.init()
@@ -78,24 +78,61 @@ if verbose > 1:
 # ### define 4 main datasets
 
 # global vars
-
+"""
 theta_unknown_S = natural_df[obs_features].to_numpy() #Reconstructed Data
 theta_unknown_G = natural_df[gen_features].to_numpy() #Nature, which unfolded data approaches
 
 theta0_S = synth_df[obs_features].to_numpy() #Simulated, synthetic reco-level
 theta0_G = synth_df[gen_features].to_numpy() #Generated, synthetic truth-level
+"""
 
+# TODO add in pt hat support
+
+# treating entire jets as the input set
+
+all_features = gen_features + obs_features
+theta_unknown = natural_df[all_features].to_numpy()
+theta0 = synth_df[all_features].to_numpy()
+
+print(80*'#')
+print(theta0)
+
+# pad lenght needs to be found manually for now
+# pad_length = np.min([max_length, np.max([split.shape[0] for split in arr])])
+pad_length = 600
+
+theta_unknown = of.split_by_index(theta_unknown, 2)
+theta_unknown = of.pad_out_splits(theta_unknown, dummyval=-1, pad_length=600)
+
+theta0 = of.split_by_index(theta0, 2)
+theta0 = of.pad_out_splits(theta0, dummyval=-1, pad_length=600)
+
+theta_unknown_G = theta_unknown[:, :, 0:3]
+theta_unknown_S = theta_unknown[:, :, 3:7]
+
+print(80*'#')
+print(theta0)
+
+theta0_G = theta0[:, :, 0:3]
+theta0_S = theta0[:, :, 3:7]
+
+theta_unknown_S[theta_unknown_S == -9999] = -1
+theta0_S[theta0_S == -9999] = -1
+
+print(80*'#')
+print(theta0_S)
 
 # limit event size
 # NOTE: using too low a number of events will yeild noisy/poor unfolding
 # N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
 """
-N_Events = 200000
+N_Events = 2000 # 200000
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
 theta_unknown_S = theta_unknown_S[:int(0.7*N_Events)]
 theta_unknown_G = theta_unknown_G[:int(0.7*N_Events)]
 """
+
 
 # learning sets partitions for horovod usage
 nevts = theta0_S.shape[0]
@@ -124,10 +161,10 @@ obs_i = 0
 
 for i,ax in enumerate(axes.ravel()):
     if (i >= N): break
-    _,_,_=ax.hist(theta0_G[:,i],binning[i],color='blue',alpha=0.5,label="MC, true")
-    _,_,_=ax.hist(theta0_S[:,i],binning[i],histtype="step",color='black',ls=':',label="MC, reco")
-    _,_,_=ax.hist(theta_unknown_G[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
-    _,_,_=ax.hist(theta_unknown_S[:,i],binning[i],histtype="step",color='black',label="Data, reco")
+    _,_,_=ax.hist(theta0_G.reshape(-1,theta0_G.shape[-1])[:,i],binning[i],color='blue',alpha=0.5,label="MC, true")
+    _,_,_=ax.hist(theta0_S.reshape(-1,theta0_S.shape[-1])[:,i],binning[i],histtype="step",color='black',ls=':',label="MC, reco")
+    _,_,_=ax.hist(theta_unknown_G.reshape(-1,theta_unknown_G.shape[-1])[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
+    _,_,_=ax.hist(theta_unknown_S.reshape(-1,theta_unknown_S.shape[-1])[:,i],binning[i],histtype="step",color='black',label="Data, reco")
 
     ax.set_title(labels[i])
     ax.set_xlabel(labels[i])
@@ -141,9 +178,8 @@ for i,ax in enumerate(axes.ravel()):
     obs_i += 1
     
 fig.tight_layout()
-fig.savefig("pre_training.png")
+fig.savefig("pre_training_try.png")
 plt.close()
-
 
 
 # TODO implement some preprocessing
@@ -158,6 +194,7 @@ plt.close()
 # |Natural Truth   |$\theta_\mathrm{unknown,G}$   | Nature  |
 
 """ run to evaluate new data, calculate new weights """
+
 K.clear_session()
 mfold = Multifold(
         nevts=nevts,
@@ -172,17 +209,22 @@ mfold.Preprocessing(weights_mc=None, weights_data=None)
 mfold.Unfold()
 myweights = mfold.GetWeights()
 
-of.save_object(myweights, "./myweights_new.p")
+of.save_object(myweights, "./myweights_try.p")
 
 
 """ run to load in saved weights """
-#myweights = of.load_object("./myweights.p")
+#myweights = of.load_object("./myweights_try.p")
 
-
+print(80*'#')
 print("multifolded weights")
 print(myweights)
 print(myweights.shape)
 
+flattened_weights = np.array([np.repeat(weight, pad_length, axis=-1) for weight in myweights])
+print(80*'#')
+print("flattened weights")
+print(flattened_weights)
+print(flattened_weights.shape)
 
 # print unfolded results for each dimension
 
@@ -198,9 +240,10 @@ for iteration in range(N_Iterations):
 
     for i,ax in enumerate(axes.ravel()):
         if (i >= N): break
-        _,_,_=ax.hist(theta0_G[:,i],binning[i],color='blue', alpha=0.5, label="MC, true")
-        _,_,_=ax.hist(theta_unknown_G[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
-        _,_,_=ax.hist(theta0_G[:,i],weights=myweights[iteration, 0, :],bins=binning[i],color='black',histtype="step",label="OmniFolded",lw=2)
+        _,_,_=ax.hist(theta0_G.reshape(-1,theta0_G.shape[-1])[:,i],binning[i],color='blue', alpha=0.5, label="MC, true")
+        _,_,_=ax.hist(theta_unknown_G.reshape(-1,theta_unknown_G.shape[-1])[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
+        
+        _,_,_=ax.hist(theta0_G.reshape(-1,theta0_G.shape[-1])[:,i],weights=flattened_weights[iteration, 0, :],bins=binning[i],color='black',histtype="step",label="OmniFolded",lw=2)
 
         ax.set_title(labels[i])
         ax.set_xlabel(labels[i])
@@ -214,8 +257,10 @@ for iteration in range(N_Iterations):
         obs_i += 1
     
     fig.tight_layout()
-    fig.savefig("post_training_" + str(iteration) + "_new.png")
+    fig.savefig("post_training_" + str(iteration) + "_try.png")
     plt.close()
+    
+exit()
 
 # ### true vs smeared EEC calculation
 

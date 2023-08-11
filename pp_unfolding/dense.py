@@ -1,6 +1,6 @@
 import tensorflow as tf
 import tensorflow.keras.backend as K
-from tensorflow.keras.layers import Dense, Input, Dropout, Conv1D, BatchNormalization
+from tensorflow.keras.layers import Dense, Input, Dropout, Conv1D, BatchNormalization, Flatten
 from tensorflow.keras.models import Model
 import numpy as np
 import sys
@@ -30,14 +30,15 @@ import sys
 #     return inputs,outputs
 
 
-def MLP(nvars,NTRIALS=10):
-    inputs = Input((nvars, ))
+def MLP(input_shape,NTRIALS=10):
+    inputs = Input(input_shape)
     net_trials = []
     for _ in range(NTRIALS):            
         layer = Dense(64,activation='relu')(inputs)
         layer = Dense(128, activation='relu')(layer)
         layer = Dense(64,activation='relu')(layer)
         #layer = Dropout(0.05)(layer) 
+        layer = Flatten()(layer)
         layer = Dense(1,activation="sigmoid")(layer)
         net_trials.append(layer)
 
