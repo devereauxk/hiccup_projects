@@ -31,5 +31,5 @@ for (( JOB_N = $START; JOB_N <= $STOP; JOB_N++ ))
 do
   FILE=$(sed -n "$JOB_N"p $FILE_PATHS)
   FILE="/global/cfs/projectdirs/alice/alicepro/hiccup${FILE}"
-  srun -n 1 -c 1 process_LHC18b8.sh $FILE $SLURM_ARRAY_JOB_ID $SLURM_ARRAY_TASK_ID
+  bash process_LHC18b8.sh $FILE $SLURM_ARRAY_JOB_ID $SLURM_ARRAY_TASK_ID
 done
