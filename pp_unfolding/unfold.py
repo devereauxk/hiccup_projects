@@ -89,13 +89,13 @@ theta0_G = synth_df[gen_features].to_numpy() #Generated, synthetic truth-level
 # limit event size
 # NOTE: using too low a number of events will yeild noisy/poor unfolding
 # N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
-
+"""
 N_Events = 200000
 theta0_G = theta0_G[:N_Events]
 theta0_S = theta0_S[:N_Events]
 theta_unknown_S = theta_unknown_S[:int(0.7*N_Events)]
 theta_unknown_G = theta_unknown_G[:int(0.7*N_Events)]
-
+"""
 
 # learning sets partitions for horovod usage
 nevts = theta0_S.shape[0]
@@ -172,7 +172,7 @@ mfold.Preprocessing(weights_mc=None, weights_data=None)
 mfold.Unfold()
 myweights = mfold.GetWeights()
 
-of.save_object(myweights, "./myweights_try.p")
+of.save_object(myweights, "./myweights_new.p")
 
 
 """ run to load in saved weights """
@@ -214,7 +214,7 @@ for iteration in range(N_Iterations):
         obs_i += 1
     
     fig.tight_layout()
-    fig.savefig("post_training_" + str(iteration) + "_try.png")
+    fig.savefig("post_training_" + str(iteration) + "_new.png")
     plt.close()
 
 # ### true vs smeared EEC calculation

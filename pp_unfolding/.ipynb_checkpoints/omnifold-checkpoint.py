@@ -92,6 +92,16 @@ class Multifold():
         '''Data versus reco MC reweighting'''
         print("RUNNING STEP 1")
         
+        self.RunModel_New(
+            np.concatenate((self.mc_reco[self.pass_reco], self.data[self.data[:,0]!=dummyval])),
+            np.concatenate((np.zeros(len(self.mc_reco[self.pass_reco])), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
+            np.concatenate((self.weights_push[self.pass_reco], np.ones(len(self.data[self.data[:,0]!=dummyval])))),
+            i, self.model1, 1
+        )
+                
+        self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model1)
+        
+        """
         self.RunModel_Old(
             np.concatenate((self.mc_reco[self.pass_reco], self.data[self.data[:,0]!=dummyval])),
             np.concatenate((np.zeros(len(self.mc_reco[self.pass_reco])), np.ones(len(self.data[self.data[:,0]!=dummyval])))),
@@ -99,6 +109,7 @@ class Multifold():
         )
                 
         self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model)
+        """
 
         # STEP 1B: Need to do something with events that don't pass reco.
         # one option is to simply do:
@@ -106,6 +117,17 @@ class Multifold():
         # Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
         print("RUNNING STEP 1B")
         
+        self.RunModel_New(
+            np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco])),
+            np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco])))),
+            np.concatenate((self.weights_pull[self.pass_reco]*self.weights_mc, np.ones(len(self.mc_gen[self.pass_reco])))),
+            i, self.model1b, 1.5
+        )
+        
+        average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model1b)
+        self.weights_pull[self.not_pass_reco] = average_vals
+        
+        """
         self.RunModel_Old(
             np.concatenate((self.mc_gen[self.pass_reco], self.mc_gen[self.pass_reco])),
             np.concatenate((np.ones(len(self.mc_gen[self.pass_reco])), np.zeros(len(self.mc_gen[self.pass_reco])))),
@@ -114,6 +136,8 @@ class Multifold():
         
         average_vals = self.reweight(self.mc_gen[self.not_pass_reco], self.model)
         self.weights_pull[self.not_pass_reco] = average_vals
+        """
+        
         # end of STEP 1B
         
         self.weights[i, :1, :] = self.weights_pull
@@ -123,6 +147,16 @@ class Multifold():
         '''Gen to Gen reweighing'''        
         print("RUNNING STEP 2")
         
+        self.RunModel_New(
+            np.concatenate((self.mc_gen, self.mc_gen)),
+            np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen)))),
+            np.concatenate((self.mc_weights, self.mc_weights*self.weights_pull)),
+            i, self.model2, 2
+        )
+        
+        new_weights=self.reweight(self.mc_gen,self.model2)
+        
+        """
         self.RunModel_Old(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen)))),
@@ -130,6 +164,7 @@ class Multifold():
         )
         
         new_weights=self.reweight(self.mc_gen,self.model)
+        """
         
         new_weights[self.not_pass_gen]=1.0
         self.weights_push = new_weights
@@ -285,16 +320,11 @@ class Multifold():
         self.model2.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
         
-        """ THIS DOENOT WORK, SOMETHING WRONG WITH the weighted_binary_crossentropy """
+        # setting up the model like this ONLY works with the format of model.fit used in RunModel
+        # i.e. not in the way used in the preliminary studies
         self.model.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
                             
-        """
-        self.model.compile(loss='binary_crossentropy',
-                           optimizer=opt,
-                           metrics=['accuracy'],
-                           weighted_metrics=[])
-                           """
 
     def GetNtrainNtest(self,stepn):
         if stepn == 1:
