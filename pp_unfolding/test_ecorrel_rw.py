@@ -151,8 +151,8 @@ def main():
 		pthat = pythia_hard.info.pTHat()
 		pt_hat_bin = len(pt_hat_lo) # 1-indexed
 		for i in range(1,len(pt_hat_lo)):
-		    if pthat >= pt_hat_yaml[i] and pthat < pt_hat_yaml[i+1]:
-		    	pt_hat_bin = i
+			if pthat >= pt_hat_yaml[i] and pthat < pt_hat_yaml[i+1]:
+				pt_hat_bin = i
 				break
 		pt_hat_weight[0] = pt_hat_yaml[pt_hat_bin]
 		
