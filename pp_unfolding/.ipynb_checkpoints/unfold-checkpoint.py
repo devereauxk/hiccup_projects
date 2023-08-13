@@ -94,6 +94,41 @@ all_features = gen_features + obs_features
 theta_unknown = natural_df[all_features].to_numpy()
 theta0 = synth_df[all_features].to_numpy()
 
+
+
+############################# PREPROCESSING ################################
+# applies logp1 to enegry weight and RL and minmax [0,1] scalling to jet pt
+log1p_transform = lambda x : np.log(x+1)
+scale_transform = lambda x : (x - 20) / (40 - 20)
+log1p_inverse = lambda x : np.exp(x) - 1
+scale_inverse = lambda x : (40 - 20) * x + 20
+for row in theta_unknown:
+    # gen features
+    row[0] = log1p_transform(row[0])
+    row[1] = log1p_transform(row[1])
+    row[2] = scale_transform(row[2])
+    
+    # obs features
+    if row[3] >= 0:
+        row[3] = log1p_transform(row[3])
+        row[4] = log1p_transform(row[4])
+        row[5] = scale_transform(row[5])
+        
+for row in theta0:
+    # gen features
+    row[0] = log1p_transform(row[0])
+    row[1] = log1p_transform(row[1])
+    row[2] = scale_transform(row[2])
+    
+    # obs features
+    if row[3] >= 0:
+        row[3] = log1p_transform(row[3])
+        row[4] = log1p_transform(row[4])
+        row[5] = scale_transform(row[5])
+
+        
+############################ MASKING/PADDING ####################################
+
 print(80*'#')
 print(theta0)
 
@@ -122,6 +157,10 @@ theta0_S[theta0_S == -9999] = -1
 print(80*'#')
 print(theta0_S)
 
+flatten = lambda x : x.reshape(-1,x.shape[-1])
+
+
+########################## PARTITIONING FOR HOROVID #############################
 # limit event size
 # NOTE: using too low a number of events will yeild noisy/poor unfolding
 # N_Events = min(np.shape(theta0_S)[0],np.shape(theta_unknown_S)[0])-1
@@ -133,8 +172,6 @@ theta_unknown_S = theta_unknown_S[:int(0.7*N_Events)]
 theta_unknown_G = theta_unknown_G[:int(0.7*N_Events)]
 """
 
-
-# learning sets partitions for horovod usage
 nevts = theta0_S.shape[0]
 
 data_vars = theta_unknown_S[hvd.rank()::hvd.size()]
@@ -149,7 +186,7 @@ print("HVD mc gen " + str(mc_gen.shape))
 print(mc_gen)
 
 
-# produce plots pre-training
+############################### PRE-TRAINING PLOTS #############################
 
 N = len(obs_features)
 
@@ -161,10 +198,12 @@ obs_i = 0
 
 for i,ax in enumerate(axes.ravel()):
     if (i >= N): break
-    _,_,_=ax.hist(theta0_G.reshape(-1,theta0_G.shape[-1])[:,i],binning[i],color='blue',alpha=0.5,label="MC, true")
-    _,_,_=ax.hist(theta0_S.reshape(-1,theta0_S.shape[-1])[:,i],binning[i],histtype="step",color='black',ls=':',label="MC, reco")
-    _,_,_=ax.hist(theta_unknown_G.reshape(-1,theta_unknown_G.shape[-1])[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
-    _,_,_=ax.hist(theta_unknown_S.reshape(-1,theta_unknown_S.shape[-1])[:,i],binning[i],histtype="step",color='black',label="Data, reco")
+    if i != 2: tiv = lambda x : log1p_inverse(flatten(x))
+    else: tiv = lambda x : scale_inverse(flatten(x))
+    _,_,_=ax.hist(tiv(theta0_G)[:,i],binning[i],color='blue',alpha=0.5,label="MC, true")
+    _,_,_=ax.hist(tiv(theta0_S)[:,i],binning[i],histtype="step",color='black',ls=':',label="MC, reco")
+    _,_,_=ax.hist(tiv(theta_unknown_G)[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
+    _,_,_=ax.hist(tiv(theta_unknown_S)[:,i],binning[i],histtype="step",color='black',label="Data, reco")
 
     ax.set_title(labels[i])
     ax.set_xlabel(labels[i])
@@ -182,10 +221,7 @@ fig.savefig("pre_training_try.png")
 plt.close()
 
 
-# TODO implement some preprocessing
-
-
-# PERFORM UNFOLDING
+############################### PERFORM UNFOLDING ###############################
 
 # |---|---|---|
 # |Synthetic Generator-Level Sim   | $\theta_{0,G}$  | Truth-Level Sim  |
@@ -226,10 +262,12 @@ print("flattened weights")
 print(flattened_weights)
 print(flattened_weights.shape)
 
-# print unfolded results for each dimension
-
 opt = of.LoadJson('config_omnifold.json')
 N_Iterations = opt['General']['NITER']
+
+
+############################## UNFOLDED DISTRIBUTIONS ############################
+# individual distros
 
 binning = [np.logspace(-5,0,100),np.logspace(-4,0,100),np.linspace(20,40,100)]
 

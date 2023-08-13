@@ -148,31 +148,32 @@ class Multifold():
         # one option is to simply do:
         # new_weights[self.not_pass_reco]=1.0
         # Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
-        print("RUNNING STEP 1B")
-        
-        self.RunModel_New(
-            np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
-            np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
-            np.concatenate((self.weights_pull[self.mc_pass_reco]*self.weights_mc[self.mc_pass_reco], np.ones(len(self.mc_gen[self.mc_pass_reco])))),
-            i, self.model1b, 1.5
-        )
-        
-        average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model1b)
-        self.weights_pull[self.not_mc_pass_reco] = average_vals
-        
-        """
-        self.RunModel_Old(
-            np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
-            np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
-            np.concatenate((self.weights_pull[self.mc_pass_reco], np.ones(len(self.mc_gen[self.mc_pass_reco]))))
-        )
-        
-        average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model)
-        self.weights_pull[self.not_mc_pass_reco] = average_vals
-        """
-        
-        
-        # end of STEP 1B
+        num_not_pass_reco = self.mc_gen[self.not_mc_pass_reco].shape[0]
+        print("percentage mc not passing reco = " + str(num_not_pass_reco) + "/" + str(self.mc_reco.shape[0]) + " = " + str(num_not_pass_reco/self.mc_reco.shape[0]))
+        if (num_not_pass_reco > 0):
+            print("RUNNING STEP 1B")
+
+            self.RunModel_New(
+                np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
+                np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
+                np.concatenate((self.weights_pull[self.mc_pass_reco]*self.weights_mc[self.mc_pass_reco], np.ones(len(self.mc_gen[self.mc_pass_reco])))),
+                i, self.model1b, 1.5
+            )
+
+            average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model1b)
+            self.weights_pull[self.not_mc_pass_reco] = average_vals
+
+            """
+            self.RunModel_Old(
+                np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
+                np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
+                np.concatenate((self.weights_pull[self.mc_pass_reco], np.ones(len(self.mc_gen[self.mc_pass_reco]))))
+            )
+
+            average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model)
+            self.weights_pull[self.not_mc_pass_reco] = average_vals
+            """
+            # end of STEP 1B
         
         self.weights[i, :1, :] = self.weights_pull
 
@@ -276,7 +277,7 @@ class Multifold():
 
         if self.verbose:
             print(80*'#')
-            print("Train events used: {}, total number of train events: {}, percentage: {}".format(NTRAIN,int(np.sum(shuffle_size)*0.8), NTRAIN/(np.sum(shuffle_size)*0.8)))
+            print("Train events used: {}, total number of train events: {}, percentage: {}".format(NTRAIN,shuffle_size, NTRAIN/shuffle_size))
             print(80*'#')
 
         verbose = 2 if hvd.rank() == 0 else 0
@@ -360,21 +361,28 @@ class Multifold():
         opt = tf.keras.optimizers.legacy.Adam(learning_rate=self.hvd_lr)
         opt = hvd.DistributedOptimizer(
             opt, average_aggregated_gradients=True)
-
+        
         self.model1.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
+        print("===== MODEL 1 =====")
+        self.model1.summary()
         
         self.model1b.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
+        print("===== MODEL 1B =====")
+        self.model1b.summary()
 
         self.model2.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False)
+        print("===== MODEL 2 ======")
+        self.model2.summary()
         
         # setting up the model like this ONLY works with the format of model.fit used in RunModel
         # i.e. not in the way used in the preliminary studies
         self.model.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False,
                             weighted_metrics=[])
+        print("===== MODEL (used for all steps) ======")
         self.model.summary()
                             
 
