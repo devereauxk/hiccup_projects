@@ -30,6 +30,12 @@ import os
 from array import array
 import numpy as np
 import uproot as ur
+import yaml
+
+with open("./scaleFactors.yaml", 'r') as stream:
+	pt_hat_yaml = yaml.safe_load(stream)
+pt_hat_lo = pt_hat_yaml["bin_lo"]
+pt_hat_hi = pt_hat_yaml["bin_hi"]
 
 # load track efficiency tree
 tr_eff_file = ur.open("tr_eff.root")
@@ -109,7 +115,7 @@ def main():
 	# TTree output definition
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
 	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
-	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
+	[obs_energy_weight, obs_R_L, obs_jet_pt, pt_hat_weight, event_n] = [array('d', [0]) for i in range(5)]
 	obs_thrown = array('d', [0])
 
 	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
@@ -119,6 +125,8 @@ def main():
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
 	preprocessed.Branch("obs_thrown", obs_thrown, "obs_thrown/D")
+	preprocessed.Branch("pt_hat_weight", pt_hat_weight, "pt_hat_weight/D")
+	preprocessed.Branch("event_n", event_n, "event_n/D")
     
 	# debug tree definitions
 	particle_pt_tree = ROOT.TTree("particle_pt", "true and smeared particle-level")
@@ -131,10 +139,22 @@ def main():
 	jet_pt_tree.Branch("gen_pt", gen_jet_pt_debug, "gen_pt/D")
 	jet_pt_tree.Branch("obs_pt", obs_jet_pt_debug, "obs_pt/D")
 
- 
+	event_n[0] = 0
 	for n in tqdm(range(args.nev)):
 		if not pythia_hard.next():
 				continue
+		
+		# count events
+		event_n[0] += 1
+		
+		# find weight from yaml file for this pthat
+		pthat = pythia_hard.info.pTHat()
+		pt_hat_bin = len(pt_hat_lo) # 1-indexed
+		for i in range(1,len(pt_hat_lo)):
+			if pthat >= pt_hat_yaml[i] and pthat < pt_hat_yaml[i+1]:
+				pt_hat_bin = i
+				break
+		pt_hat_weight[0] = pt_hat_yaml[pt_hat_bin]
 		
 		#======================================
 		#            Particle level
