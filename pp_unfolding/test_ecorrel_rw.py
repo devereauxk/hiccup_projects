@@ -209,8 +209,8 @@ def main():
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
 			for i in range(len(EEC_rs)):
-				event_index1 = _v[EEC_indicies1[i]].user_index()
-				event_index2 = _v[EEC_indicies2[i]].user_index()
+				event_index1 = _v[int(EEC_indicies1[i])].user_index()
+				event_index2 = _v[int(EEC_indicies2[i])].user_index()
 				truth_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
 
 		############################# SMEARED PAIRS ################################
@@ -242,8 +242,8 @@ def main():
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
 			for i in range(len(EEC_rs)):
-				event_index1 = _v[EEC_indicies1[i]].user_index()
-				event_index2 = _v[EEC_indicies2[i]].user_index()
+				event_index1 = _v[int(EEC_indicies1[i])].user_index()
+				event_index2 = _v[int(EEC_indicies2[i])].user_index()
 				smeared_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
 				
 		########################## TTree output generation #########################
