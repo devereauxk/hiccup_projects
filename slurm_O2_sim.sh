@@ -6,4 +6,4 @@
 #SBATCH --output=/home/kdevereaux/hiccup_projects/slurm-%j.out
 
 #run the application:
-srun /home/kdevereaux/hiccup_projects/process_O2_sim.sh
+bash /home/kdevereaux/hiccup_projects/process_O2_sim.sh

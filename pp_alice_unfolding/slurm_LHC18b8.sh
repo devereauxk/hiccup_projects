@@ -7,7 +7,7 @@
 #SBATCH --nodes=1 --ntasks=1 --cpus-per-task=1
 #SBATCH --time=04:00:00
 #SBATCH --array=1-2000
-#SBATCH --output=/global/cfs/projectdirs/alice/kdevero/jobout/slurm-%A_%a.out
+#SBATCH --output=/global/cfs/projectdirs/alice/kdevero/jobout/slurm-%A/%a.out
 
 FILE_PATHS='/global/cfs/projectdirs/alice/alicepro/hiccup/rstorage/alice/data/LHC18b8/569/files.txt'
 NFILES=$(wc -l < $FILE_PATHS)

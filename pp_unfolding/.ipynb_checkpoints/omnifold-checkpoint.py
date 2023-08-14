@@ -123,7 +123,7 @@ class Multifold():
     def RunStep1(self,i):
         '''Data versus reco MC reweighting'''
         print("RUNNING STEP 1")
-        
+        """
         self.RunModel_New(
             np.concatenate((self.mc_reco[self.mc_pass_reco], self.data[self.data_pass_reco])),
             np.concatenate((np.zeros(len(self.mc_reco[self.mc_pass_reco])), np.ones(len(self.data[self.data_pass_reco])))),
@@ -141,7 +141,7 @@ class Multifold():
         )
                 
         self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model)
-        """
+        
         
 
         # STEP 1B: Need to do something with events that don't pass reco.
@@ -152,7 +152,7 @@ class Multifold():
         print("percentage mc not passing reco = " + str(num_not_pass_reco) + "/" + str(self.mc_reco.shape[0]) + " = " + str(num_not_pass_reco/self.mc_reco.shape[0]))
         if (num_not_pass_reco > 0):
             print("RUNNING STEP 1B")
-
+            """
             self.RunModel_New(
                 np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
                 np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
@@ -172,7 +172,7 @@ class Multifold():
 
             average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model)
             self.weights_pull[self.not_mc_pass_reco] = average_vals
-            """
+            
             # end of STEP 1B
         
         self.weights[i, :1, :] = self.weights_pull
@@ -182,7 +182,7 @@ class Multifold():
         '''Gen to Gen reweighing'''        
         print("RUNNING STEP 2")
         
-        
+        """
         self.RunModel_New(
             np.concatenate((self.mc_gen, self.mc_gen)),
             np.concatenate((np.zeros(len(self.mc_gen)), np.ones(len(self.mc_gen)))),
@@ -200,7 +200,7 @@ class Multifold():
         )
         
         new_weights=self.reweight(self.mc_gen,self.model)
-        """
+        
         
         new_weights[self.not_pass_gen]=1.0
         self.weights_push = new_weights
@@ -379,9 +379,15 @@ class Multifold():
         
         # setting up the model like this ONLY works with the format of model.fit used in RunModel
         # i.e. not in the way used in the preliminary studies
+        """
         self.model.compile(loss=weighted_binary_crossentropy,
                             optimizer=opt,experimental_run_tf_function=False,
                             weighted_metrics=[])
+        """
+        self.model.compile(loss='binary_crossentropy',
+                           optimizer=opt,
+                           metrics=['accuracy'],
+                           weighted_metrics=[])
         print("===== MODEL (used for all steps) ======")
         self.model.summary()
                             
