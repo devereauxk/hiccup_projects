@@ -115,8 +115,8 @@ def main():
 	# TTree output definition
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
 	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
-	[obs_energy_weight, obs_R_L, obs_jet_pt, pt_hat_weight, event_n] = [array('d', [0]) for i in range(5)]
-	obs_thrown = array('d', [0])
+	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
+	[pt_hat_weight, event_n] = [array('d', [0]) for i in range(2)]
 
 	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
 	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/D")
@@ -124,7 +124,6 @@ def main():
 	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/D")
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
-	preprocessed.Branch("obs_thrown", obs_thrown, "obs_thrown/D")
 	preprocessed.Branch("pt_hat_weight", pt_hat_weight, "pt_hat_weight/D")
 	preprocessed.Branch("event_n", event_n, "event_n/D")
     
@@ -253,7 +252,6 @@ def main():
 			gen_energy_weight[0] = t_pair.weight
 			gen_R_L[0] = t_pair.r
 			gen_jet_pt[0] = t_pair.pt
-			obs_thrown[0] = 0
 
 			match_found = False
 			for s_pair in smeared_pairs:
@@ -268,7 +266,6 @@ def main():
 				obs_energy_weight[0] = dummyval
 				obs_R_L[0] = dummyval
 				obs_jet_pt[0] = dummyval
-				obs_thrown[0] = 1
 				preprocessed.Fill()
 
 		# fill jet resolution debug ttree
