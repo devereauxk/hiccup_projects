@@ -83,6 +83,7 @@ def get_args_from_settings(ssettings):
 	pyconf.add_standard_pythia_args(parser)
 	parser.add_argument('--output', default="test_ecorrel_rw.root", type=str)
 	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
+	parser.add_argument('--tr_eff_off', action='store_true', default=False)
 	args = parser.parse_args()
 	return args
 
@@ -171,7 +172,7 @@ def main():
             
 			# smearing + track efficiency
 			obs_pt[0] = -9999
-			if do_keep_track(part):
+			if args.tr_eff_off or do_keep_track(part):
 				smeared_part = smear_track(part, 0.01)
 				parts_pythia_p_smeared.push_back(smeared_part)
 				obs_pt[0] = smeared_part.perp()
