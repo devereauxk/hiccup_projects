@@ -1,8 +1,8 @@
 {"General": {
-    "NITER": 2,
+    "NITER": 3,
     "LR": 1e-4,
-    "BATCH_SIZE": 20000,
-    "EPOCHS": 20,
+    "BATCH_SIZE": 200,
+    "EPOCHS": 150,
     "NWARMUP": 5,
     "NPATIENCE": 10
 },

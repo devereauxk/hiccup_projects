@@ -1,5 +1,7 @@
 # horovod usage:
 # horovodrun --gloo -np 4 -H localhost:4 python unfold.py
+# single gpu usage:
+# python -u unfold.py --level=jet --save_weights=./myweights_400k_jet200_150_3kings_temp.p --suffix=_400k_jet200_150_3kings_temp --preprocess
 
 import sys, os
 print(sys.path)
@@ -11,6 +13,7 @@ import argparse
 
 import omnifold as of
 from omnifold import Multifold
+from omnifold import flatten
 import tensorflow as tf
 import tensorflow.keras.backend as K
 import horovod.tensorflow.keras as hvd
@@ -18,7 +21,7 @@ import horovod.tensorflow.keras as hvd
 from matplotlib import pyplot as plt
 from IPython.display import Image
 pd.set_option('display.max_columns', None) # to see all columns of df.head()
-np.set_printoptions(edgeitems=2) 
+np.set_printoptions(edgeitems=3) 
 
 
 hvd.init()
@@ -39,8 +42,9 @@ parser.add_argument('--level', default='pair', help='[pair/jet/event]')
 parser.add_argument('--config', default='config_omnifold.json', help='Basic config file containing general options')
 parser.add_argument('--save_weights', default=None, help='directory to save weights in')
 parser.add_argument('--load_weights', default=None, help='directory of weights to load from')
-parser.add_argument('--plot_suffix', default="", help='suffix to add the end of weights plot names')
+parser.add_argument('--suffix', default="", help='suffix to add the end of weights plot names')
 parser.add_argument('--nevents', type=float,default=-1, help='Number of events to load; if None, max amount used')
+parser.add_argument('--preprocess', action='store_true', default=False,help='Scale/normalize input data to improve training efficacy')
 parser.add_argument('--closure', action='store_true', default=False,help='Train omnifold for a closure test using simulation')
 parser.add_argument('--verbose', action='store_true', default=False,help='Display additional information during training')
 
@@ -68,7 +72,9 @@ labels = ["energy weight", "$R_L$", "jet $p_T$"]
 # ### Import "natural reco": ALICE measured (testing: PYTHIA8 generator-level)
 # ### Import "natural truth": ALICE truth (testing: PYTHIA8 generator-level, unused during actuall unfolding) 
 
-natural_file = "preprocess_tr_eff_sigmap2.root"
+#natural_file = "preprocess_sigma2_100k_treffoff.root"
+natural_file = "preprocess_sigma2_400k.root"
+#natural_file = "preprocess_tr_eff_sigmap2.root"
 natural_tree = ur.open("%s:preprocessed"%(natural_file))
 natural_df = natural_tree.arrays(library="pd") #open the TTree as a pandas data frame
 
@@ -82,7 +88,9 @@ if verbose > 1:
 
 
 # ### Import "synthetic simulation", both generated and reconstructed level.
-synthetic_file = "preprocess_tr_eff_cross_ref.root"
+#synthetic_file = "preprocess_sigma335_100k_treffoff.root"
+synthetic_file = "preprocess_sigma335_400k.root"
+#synthetic_file = "preprocess_tr_eff_cross_ref.root"
 synth_tree = ur.open("%s:preprocessed"%(synthetic_file))
 synth_df = synth_tree.arrays(library="pd")
 
@@ -95,61 +103,90 @@ if verbose > 1:
 
 # ### define 4 main datasets
 
-# global vars
-"""
-theta_unknown_S = natural_df[obs_features].to_numpy() #Reconstructed Data
-theta_unknown_G = natural_df[gen_features].to_numpy() #Nature, which unfolded data approaches
-
-theta0_S = synth_df[obs_features].to_numpy() #Simulated, synthetic reco-level
-theta0_G = synth_df[gen_features].to_numpy() #Generated, synthetic truth-level
-"""
-
 # TODO add in pt hat support
-
-# treating entire jets as the input set
 
 all_features = gen_features + obs_features
 theta_unknown = natural_df[all_features].to_numpy()
 theta0 = synth_df[all_features].to_numpy()
 
 
+
+############# RL cut
+RL_min = 5 * (10**-3)
+
+for row in theta_unknown:    
+    if row[4] < RL_min:
+        row[3:] = [-9999 for i in range(3)]
+        
+for row in theta0:    
+    if row[4] < RL_min:
+        row[3:] = [-9999 for i in range(3)]
+
+
+
 ############################# PREPROCESSING ################################
 # applies logp1 to enegry weight and RL and minmax [0,1] scalling to jet pt
+if flags.preprocess:
+    
+    print(80*'#')
+    print("preprocessing...\n")
 
-log1p_transform = lambda x : np.log(x+1)
-scale_transform = lambda x : (x - 20) / (40 - 20)
-log1p_inverse = lambda x : np.exp(x) - 1
-scale_inverse = lambda x : (40 - 20) * x + 20
-for row in theta_unknown:
-    # gen features
-    row[0] = log1p_transform(row[0])
-    row[1] = log1p_transform(row[1])
-    row[2] = scale_transform(row[2])
+    log1p_transform = lambda x : -1*np.log(x) / 10
+    log1p_inverse = lambda x : np.exp(-10*x)
+    sqrt_transform = lambda x : np.sqrt(x)
+    sqrt_inverse = lambda x : x**2
+    scale_transform = lambda x : (x - 20) / (40 - 20)
+    scale_inverse = lambda x : (40 - 20) * x + 20
+    transforms = [log1p_transform, sqrt_transform, scale_transform]
+    inverses = [log1p_inverse, sqrt_inverse, scale_inverse]
+
+    print(theta_unknown)
+    for row in theta_unknown:
+        # gen features
+        row[0] = log1p_transform(row[0])
+        row[1] = sqrt_transform(row[1])
+        row[2] = scale_transform(row[2])
+
+        # obs features
+        if row[3] >= 0:
+            row[3] = log1p_transform(row[3])
+            row[4] = sqrt_transform(row[4])     # obs RL
+            row[5] = scale_transform(row[5])
+
+    for row in theta0:
+        # gen features
+        row[0] = log1p_transform(row[0])
+        row[1] = sqrt_transform(row[1])
+        row[2] = scale_transform(row[2])
+
+        # obs features
+        if row[3] >= 0:
+            row[3] = log1p_transform(row[3])
+            row[4] = sqrt_transform(row[4])
+            row[5] = scale_transform(row[5])
+
+
+    print(30*'#')
+    print(theta_unknown)
     
-    # obs features
-    if row[3] >= 0:
-        row[3] = log1p_transform(row[3])
-        row[4] = log1p_transform(row[4])
-        row[5] = scale_transform(row[5])
-        
-for row in theta0:
-    # gen features
-    row[0] = log1p_transform(row[0])
-    row[1] = log1p_transform(row[1])
-    row[2] = scale_transform(row[2])
+else:
+    # identity transforms
+    print(80*'#')
+    print("skipping preprocessing...\n")
     
-    # obs features
-    if row[3] >= 0:
-        row[3] = log1p_transform(row[3])
-        row[4] = log1p_transform(row[4])
-        row[5] = scale_transform(row[5])
+    transforms = [lambda x:x for i in range(3)]
+    inverses = transforms
+
 
         
 ############################ MASKING/PADDING ####################################
-
-flatten = lambda x : x.reshape(-1,x.shape[-1])
-
 print(80*'#')
+print("masking/padding\n")
+
+# make guarantee dummyval in each set is set to = -1
+theta_unknown[theta_unknown < 0] = -1
+theta0[theta0 < 0] = -1
+
 print(theta0)
     
 if flags.level == 'pair':    
@@ -160,6 +197,7 @@ if flags.level == 'pair':
     theta0_S = theta0[:, 3:7]
     
     pad_length = 1
+    
 
 elif flags.level == 'jet':
     # pad lenght needs to be found manually for now
@@ -167,9 +205,49 @@ elif flags.level == 'jet':
     pad_length = 600
 
     theta_unknown = of.split_by_index(theta_unknown, 2)
+    
+    jet_sizes = np.array([jet.shape[0] for jet in theta_unknown])
+    print("theta_unknown jet pairs avg : " + str(np.mean(jet_sizes)))
+    print("theta_unknown jet pairs std : " + str(np.std(jet_sizes)))
+    print("theta_unknown jet pairs max : " + str(np.max(jet_sizes)))
+    
     theta_unknown = of.pad_out_splits(theta_unknown, dummyval=-1, pad_length=pad_length)
+    
+    print("theta_unknown jets lost from being longer than pad length : " + str(np.sum([size > pad_length for size in jet_sizes]) / jet_sizes.shape[0]))
 
     theta0 = of.split_by_index(theta0, 2)
+    
+    jet_sizes = np.array([jet.shape[0] for jet in theta0])
+    print("theta_unknown jet pairs avg : " + str(np.mean(jet_sizes)))
+    print("theta_unknown jet pairs std : " + str(np.std(jet_sizes)))
+    print("theta_unknown jet pairs max : " + str(np.max(jet_sizes)))
+    
+    theta0 = of.pad_out_splits(theta0, dummyval=-1, pad_length=pad_length)
+    
+    print("theta0 jets lost from being longer than pad length : " + str(np.sum([size > pad_length for size in jet_sizes]) / jet_sizes.shape[0]))
+    
+    print(80*'#')
+    print(theta0)
+
+    # TEMPORARY remove instances where reco jet is not found
+    # theta_unknown = theta_unknown[theta_unknown[:,0,4] != -1]
+    # theta0 = theta0[theta0[:,0,4] != -1]
+    
+    theta_unknown_G = theta_unknown[:, :, 0:3]
+    theta_unknown_S = theta_unknown[:, :, 3:7]
+
+    theta0_G = theta0[:, :, 0:3]
+    theta0_S = theta0[:, :, 3:7]
+    
+
+    """
+elif flags.level == 'event':
+    pad_length = 600
+    
+    theta_unknown = of.split_by_index(theta_unknown, 4)
+    theta_unknown = of.pad_out_splits(theta_unknown, dummyval=-1, pad_length=pad_length)
+
+    theta0 = of.split_by_index(theta0, 7)
     theta0 = of.pad_out_splits(theta0, dummyval=-1, pad_length=pad_length)
     
     print(80*'#')
@@ -180,6 +258,8 @@ elif flags.level == 'jet':
 
     theta0_G = theta0[:, :, 0:3]
     theta0_S = theta0[:, :, 3:7]
+    """
+    
     
 else:
     print("--level arguement not recognized")
@@ -187,10 +267,6 @@ else:
     
 print(80*'#')
 print(theta0_S)
-
-# make guarantee dummyval in each set is set to = -1
-theta_unknown_S[theta_unknown_S == -9999] = -1
-theta0_S[theta0_S == -9999] = -1
 
 
 ########################## PARTITIONING FOR HOROVID #############################
@@ -228,18 +304,18 @@ print(mc_gen)
 
 ############################### PRE-TRAINING PLOTS #############################
 
+# distributions
 N = len(obs_features)
 
 binning = [np.logspace(-5,0,100),np.logspace(-4,0,100),np.linspace(20,40,100)]
 
 fig, axes = plt.subplots(1, 3, figsize=(15,4))
 
-obs_i = 0
-
 for i,ax in enumerate(axes.ravel()):
     if (i >= N): break
-    if i != 2: tiv = lambda x : log1p_inverse(flatten(x))
-    else: tiv = lambda x : scale_inverse(flatten(x))
+    
+    tiv = lambda x : inverses[i](flatten(x, level=flags.level))
+    
     _,_,_=ax.hist(tiv(theta0_G)[:,i],binning[i],color='blue',alpha=0.5,label="MC, true")
     _,_,_=ax.hist(tiv(theta0_S)[:,i],binning[i],histtype="step",color='black',ls=':',label="MC, reco")
     _,_,_=ax.hist(tiv(theta_unknown_G)[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
@@ -250,14 +326,37 @@ for i,ax in enumerate(axes.ravel()):
     ax.set_ylabel("Events")
     ax.legend(frameon=False)
     
-    if obs_i in [0, 1]:
+    if i in [0, 1]:
         ax.set_xscale('log')
         ax.set_yscale('log')
-        
-    obs_i += 1
     
 fig.tight_layout()
-fig.savefig("pre_training"+flags.plot_suffix+".png")
+fig.savefig("pre_training"+flags.suffix+".png")
+plt.close()
+
+# preprocessing efficacy
+
+binning = [np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100)]
+
+fig, axes = plt.subplots(1, 3, figsize=(15,4))
+
+for i,ax in enumerate(axes.ravel()):
+    if (i >= N): break
+    
+    tiv = lambda x : flatten(x, level=flags.level)
+    
+    _,_,_=ax.hist(tiv(theta0_G)[:,i],binning[i],color='blue',alpha=0.5,label="MC, true")
+    _,_,_=ax.hist(tiv(theta0_S)[:,i],binning[i],histtype="step",color='black',ls=':',label="MC, reco")
+    _,_,_=ax.hist(tiv(theta_unknown_G)[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
+    _,_,_=ax.hist(tiv(theta_unknown_S)[:,i],binning[i],histtype="step",color='black',label="Data, reco")
+
+    ax.set_title(labels[i])
+    ax.set_xlabel(labels[i])
+    ax.set_ylabel("Events")
+    ax.legend(frameon=False)
+    
+fig.tight_layout()
+fig.savefig("preprocessing_result"+flags.suffix+".png")
 plt.close()
 
 
@@ -300,35 +399,35 @@ print("multifolded weights")
 print(myweights)
 print(myweights.shape)
 
-flattened_weights = np.array([np.repeat(weight, pad_length, axis=-1) for weight in myweights])
+flattened_weights = of.flatten_weights(myweights, theta0_G, level=flags.level)
+flattened_weights_reco = of.flatten_weights(myweights, theta0_S, level=flags.level)
+
 print(80*'#')
 print("flattened weights")
 print(flattened_weights)
 print(flattened_weights.shape)
 
 opt = of.LoadJson(flags.config)
-N_Iterations = opt['General']['NITER']
+N_Iterations = myweights.shape[0] # opt['General']['NITER']
 
 
 ############################## UNFOLDED DISTRIBUTIONS ############################
 # individual distros
 
-binning = [np.logspace(-5,0,100),np.logspace(-4,0,100),np.linspace(20,40,100)]
-
 for iteration in range(N_Iterations):
-    fig, axes = plt.subplots(2, 3, figsize=(15,7))
-
+    fig, axes = plt.subplots(3, 3, figsize=(15,11))
+    
     # ROW 1: raw distributions
+    binning = [np.logspace(-5,0,100),np.logspace(-4,0,100),np.linspace(20,40,100)]
     for i in range(3):
         ax = axes[0, i]
 
-        if i in [0, 1]: tiv = lambda x : log1p_inverse(flatten(x))
-        else: tiv = lambda x : scale_inverse(flatten(x))
+        tiv = lambda x : inverses[i](flatten(x, level=flags.level))
 
         _,_,_=ax.hist(tiv(theta0_G)[:,i],binning[i],color='blue', alpha=0.5, label="MC, true")
         _,_,_=ax.hist(tiv(theta_unknown_G)[:,i],binning[i],color='orange',alpha=0.5,label="Data, true")
-
-        _,bins,_=ax.hist(tiv(theta0_G)[:,i],weights=flattened_weights[iteration, 0, :],bins=binning[i],color='black',histtype="step",label="MuliFolded",lw=1)
+        
+        _,bins,_=ax.hist(tiv(theta0_G)[:,i],weights=flattened_weights[iteration, 1, :],bins=binning[i],color='black',histtype="step",label="MuliFolded",lw=1)
         
         ax.set_title(labels[i])
         ax.set_xlabel(labels[i])
@@ -343,56 +442,138 @@ for iteration in range(N_Iterations):
     for i in range(3):
         ax = axes[1, i]
 
-        if i in [0, 1]: tiv = lambda x : log1p_inverse(flatten(x))
-        else: tiv = lambda x : scale_inverse(flatten(x))
+        tiv = lambda x : inverses[i](flatten(x, level=flags.level))
         
-        unfolded_hist, _ = np.histogram(tiv(theta0_G)[:,i], binning[i], weights=flattened_weights[iteration, 0, :])
+        # detector-level
+        unfolded_hist, _ = np.histogram(tiv(theta0_S)[:,i], binning[i], weights=flattened_weights_reco[iteration, 0, :])
+        true_hist, _ = np.histogram(tiv(theta_unknown_S)[:,i], binning[i])
+        err_hist = np.divide(unfolded_hist-true_hist, true_hist, out=np.zeros_like(unfolded_hist-true_hist), where=true_hist!=0)
+                             
+        ax.step(binning[i][1:],err_hist,where="pre",color='black',label="MuliFolded (reco)",lw=1)
+        
+        # particle-level
+        unfolded_hist, _ = np.histogram(tiv(theta0_G)[:,i], binning[i], weights=flattened_weights[iteration, 1, :])
         true_hist, _ = np.histogram(tiv(theta_unknown_G)[:,i], binning[i])
         err_hist = np.divide(unfolded_hist-true_hist, true_hist, out=np.zeros_like(unfolded_hist-true_hist), where=true_hist!=0)
                              
-        ax.step(binning[i][1:],err_hist,where="pre",color='red',label="MuliFolded",lw=1)
+        ax.step(binning[i][1:],err_hist,where="pre",color='red',label="MuliFolded (true)",lw=1)
         ax.hlines(y=0, xmin=binning[i][0], xmax=binning[i][len(binning[i])-1], color='grey', linestyle='--')
 
         ax.set_xlabel(labels[i])
         ax.set_ylabel("relative error")
-        extremity = 1.2 * abs(max(err_hist.max(), err_hist.min(), key=abs))
-        ax.set_ylim([-extremity, extremity])
         ax.legend(frameon=False)
         
         if i in [0, 1]:
             ax.set_xscale('log')
+            ax.set_ylim([-0.5, 0.5])
+        else:
+            ax.set_ylim([-1, 1])
+            
+    # ROW 3: distributions, preprocessed inputs (gaussians)
+    binning = [np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100)]
+    for i in range(3):
+        ax = axes[2, i]
+
+        tiv = lambda x : flatten(x, level=flags.level)
+        
+        # detector-level (step 1+1b)
+        _,_,_=ax.hist(tiv(theta0_S)[:,i],binning[i],histtype="step",color='black',ls=':',label="MC, reco")
+        _,_,_=ax.hist(tiv(theta_unknown_S)[:,i],binning[i],color='orange',alpha=0.5,label="Data, reco")
+        _,_,_=ax.hist(tiv(theta0_S)[:,i],weights=flattened_weights_reco[iteration, 0, :],bins=binning[i],color='black',histtype="step",label="MuliFolded (reco)",lw=1)
+        
+        # particle-level (step 2)
+        _,_,_=ax.hist(tiv(theta0_G)[:,i],binning[i], histtype="step",color='green',ls=':', label="MC, true")
+        _,_,_=ax.hist(tiv(theta_unknown_G)[:,i],binning[i], color='green',alpha=0.2, label="Data, true")
+        _,_,_=ax.hist(tiv(theta0_G)[:,i],weights=flattened_weights[iteration, 1, :],bins=binning[i],color='red',histtype="step",label="MuliFolded (true)",lw=1)
+        
+        ax.set_xlabel(labels[i])
+        ax.set_ylabel("Events")
+        ax.legend(frameon=False)
+    
     
     fig.tight_layout()
-    fig.savefig("post_training_" + str(iteration) + flags.plot_suffix + ".png")
+    fig.savefig("post_training_" + str(iteration) + flags.suffix + ".png")
     plt.close()
     
-exit()
+    
+    
+############################## WEIGHTS DISTRIBUTIONS ############################
+fig = plt.figure()
+for iteration in range(N_Iterations-1):
+    
+    # step 1 (sand step 1b) weights
+    plt.plot(np.sort((myweights[iteration+1, 0, :] - myweights[iteration, 0, :])/myweights[iteration,0,:]), label="iteration "+str(iteration)+", step 1")
 
-# ### true vs smeared EEC calculation
-
-plt.clf()
-binning = np.logspace(-4, np.log10(0.4), 100)
-
-_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0], color='blue', alpha=0.5, label="MC, true")
-_,_,_=plt.hist(theta0_S[:,1], binning, weights=theta0_S[:,0], histtype="step", color='black',ls=':',label="MC, reco")
-_,_,_=plt.hist(theta_unknown_G[:,1], binning, weights=theta_unknown_G[:,0], color='orange',alpha=0.5,label="Data, true")
-_,_,_=plt.hist(theta_unknown_S[:,1], binning, weights=theta_unknown_S[:,0], histtype="step",color='black',label="Data, reco")
-
-_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0] * myweights[-1, 0, :], color='black', histtype="step", label="MuliFolded", lw=2) # omnifolded
-
-
-plt.xscale('log')
-plt.yscale('log')
-plt.xlim(3E-3, 0.5)
-plt.ylim(1E-1,1E3)
-
-plt.xlabel("$R_L$")
-plt.ylabel("cs")
-plt.title("EEC calculation")
-plt.legend(frameon=False, loc='upper left')
-plt.savefig("unfolded_EEC.png")
+    plt.title("step 1 learned weight")
+    plt.xlabel("sorted pairs/jets")
+    plt.ylabel("$(w_{n+1} - w_n) / w_n$")
+    plt.legend(frameon=False)
+        
+fig.tight_layout()
+fig.savefig("weights_step1_" + flags.suffix + ".png")
 plt.close()
 
+fig = plt.figure()
+for iteration in range(N_Iterations-1):
+    
+    # step 2 weights
+    plt.plot(np.sort((myweights[iteration+1, 1, :] - myweights[iteration, 1, :])/myweights[iteration,1,:]), label="iteration "+str(iteration)+", step 2")
+
+    plt.title("step 2 learned weight")
+    plt.xlabel("sorted pairs/jets")
+    plt.ylabel("$(w_{n+1} - w_n) / w_n$")
+    plt.legend(frameon=False)
+        
+fig.tight_layout()
+fig.savefig("weights_step2_" + flags.suffix + ".png")
+plt.close()
+
+
+    
+
+############################## EEC DISTRIBUTIONS ############################
+w_iter = 0 # iteration of weights to use, for highest set to =-1, for first set to 0
+
+# ### true vs smeared EEC calculation
+fig, axes = plt.subplots(2, 1, figsize=(5,7))
+binning = np.logspace(-4, np.log10(0.4), 100)
+
+tiv_weight = lambda x : inverses[0](flatten(x, level=flags.level))
+tiv_RL = lambda x : inverses[1](flatten(x, level=flags.level))
+
+# EEC distribution
+ax = axes[0]
+
+_,_,_=ax.hist(tiv_RL(theta0_G)[:,1], binning, weights=tiv_weight(theta0_G)[:,0], color='blue', alpha=0.5, label="MC, true")
+_,_,_=ax.hist(tiv_RL(theta_unknown_G)[:,1], binning, weights=tiv_weight(theta_unknown_G)[:,0], color='orange',alpha=0.5,label="Data, true")
+_,bins,_=ax.hist(tiv_RL(theta0_G)[:,1], binning, weights=tiv_weight(theta0_G)[:,0]*flattened_weights[w_iter, 1, :], color='black',histtype="step",label="MuliFolded",lw=1)
+
+ax.set_title("EEC unfolded")
+ax.set_xlabel("$R_L$")
+ax.set_ylabel("EEC")
+ax.legend(frameon=False)
+ax.set_xscale('log')
+ax.set_yscale('log')
+
+# residual EEC
+ax = axes[1]
+        
+unfolded_hist, _ = np.histogram(tiv_RL(theta0_G)[:,1], binning, weights=tiv_weight(theta0_G)[:,0]*flattened_weights[w_iter, 1, :])
+true_hist, _ = np.histogram(tiv_RL(theta_unknown_G)[:,1], binning, weights=tiv_weight(theta_unknown_G)[:,0])
+err_hist = np.divide(unfolded_hist-true_hist, true_hist, out=np.zeros_like(unfolded_hist-true_hist), where=true_hist!=0)
+
+ax.step(binning[1:],err_hist,where="pre",color='red',label="MuliFolded",lw=1)
+ax.hlines(y=0, xmin=binning[0], xmax=binning[len(binning)-1], color='grey', linestyle='--')
+
+ax.set_xlabel("$R_L$")
+ax.set_ylabel("relative error")
+ax.legend(frameon=False)
+ax.set_xscale('log')
+ax.set_ylim([-0.5, 0.5])
+
+fig.tight_layout()
+fig.savefig("unfolded_EEC_" + flags.suffix + ".png")
+plt.close()
 
 
 # ### true vs smeared EEC calculation, normalized by number of jets
@@ -409,29 +590,44 @@ print("number of MC true jets    = " + str(Njets_theta0_G))
 print("number of Data reco jets  = " + str(Njets_theta0_S))
 print("number of Data truth jets = " + str(Njets_unfolded) + " (ESTIMATED BY ME)")
 
-
 plt.clf()
-binning = np.logspace(-4, np.log10(0.4), 100)
+fig, axes = plt.subplots(2, 1, figsize=(5,7))
 
-_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0]/Njets_theta0_G, color='blue', alpha=0.5, label="MC, true")
-_,_,_=plt.hist(theta0_S[:,1], binning, weights=theta0_S[:,0]/Njets_theta0_S, histtype="step", color='black',ls=':',label="MC, reco")
-_,_,_=plt.hist(theta_unknown_G[:,1], binning, weights=theta_unknown_G[:,0]/Njets_theta_unknown_G, color='orange',alpha=0.5,label="Data, true")
-_,_,_=plt.hist(theta_unknown_S[:,1], binning, weights=theta_unknown_S[:,0]/Njets_theta_unknown_S, histtype="step",color='black',label="Data, reco")
+# EEC distribution
+ax = axes[0]
 
-_,_,_=plt.hist(theta0_G[:,1], binning, weights=theta0_G[:,0] * myweights[-1, 0, :] / Njets_unfolded, color='black', histtype="step", label="MuliFolded", lw=2) # omnifolded
+_,_,_=ax.hist(tiv_RL(theta0_G)[:,1], binning, weights=tiv_weight(theta0_G)[:,0]/Njets_theta0_G, color='blue', alpha=0.5, label="MC, true")
+_,_,_=ax.hist(tiv_RL(theta_unknown_G)[:,1], binning, weights=tiv_weight(theta_unknown_G)[:,0]/Njets_theta_unknown_G, color='orange',alpha=0.5,label="Data, true")
+_,bins,_=ax.hist(tiv_RL(theta0_G)[:,1], binning, weights=tiv_weight(theta0_G)[:,0]*flattened_weights[w_iter, 1, :]/Njets_unfolded, color='black',histtype="step",label="MuliFolded",lw=1)
 
 
-plt.xscale('log')
-plt.yscale('log')
-plt.xlim(3E-3, 0.5)
-plt.ylim(1E-5,1E-1)
+ax.set_title("EEC unfolded")
+ax.set_xlabel("$R_L$")
+ax.set_ylabel("cs / number of jets")
+ax.legend(frameon=False)
+ax.set_xscale('log')
+ax.set_yscale('log')
 
-plt.xlabel("$R_L$")
-plt.ylabel("cs / number of jets")
-plt.title("EEC calculation")
-plt.legend(frameon=False, loc='upper left')
-plt.savefig("unfolded_EEC_normbyjets.png")
+# residual EEC
+ax = axes[1]
+        
+unfolded_hist, _ = np.histogram(tiv_RL(theta0_G)[:,1], binning, weights=tiv_weight(theta0_G)[:,0]*flattened_weights[w_iter, 1, :]/Njets_theta0_G)
+true_hist, _ = np.histogram(tiv_RL(theta_unknown_G)[:,1], binning, weights=tiv_weight(theta_unknown_G)[:,0]/Njets_theta_unknown_G)
+err_hist = np.divide(unfolded_hist-true_hist, true_hist, out=np.zeros_like(unfolded_hist-true_hist), where=true_hist!=0)
+
+ax.step(binning[1:],err_hist,where="pre",color='red',label="MuliFolded",lw=1)
+ax.hlines(y=0, xmin=binning[0], xmax=binning[len(binning)-1], color='grey', linestyle='--')
+
+ax.set_xlabel("$R_L$")
+ax.set_ylabel("relative error")
+ax.legend(frameon=False)
+ax.set_xscale('log')
+ax.set_ylim([-0.5, 0.5])
+
+fig.tight_layout()
+fig.savefig("unfolded_EEC_normbyjets_" + flags.suffix + ".png")
 plt.close()
+
 
 N_truth_jets = len(np.unique(theta0_G[:,2]))
 N_det_jets = len(np.unique(theta0_S[:,2]))
