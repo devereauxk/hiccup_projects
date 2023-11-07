@@ -83,6 +83,7 @@ def get_args_from_settings(ssettings):
 	pyconf.add_standard_pythia_args(parser)
 	parser.add_argument('--output', default="test_ecorrel_rw.root", type=str)
 	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
+	parser.add_argument('--tr_eff_off', action='store_true', default=False)
 	args = parser.parse_args()
 	return args
 
@@ -115,8 +116,8 @@ def main():
 	# TTree output definition
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
 	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
-	[obs_energy_weight, obs_R_L, obs_jet_pt, pt_hat_weight, event_n] = [array('d', [0]) for i in range(5)]
-	obs_thrown = array('d', [0])
+	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
+	[pt_hat_weight, event_n] = [array('d', [0]) for i in range(2)]
 
 	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
 	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/D")
@@ -124,7 +125,6 @@ def main():
 	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/D")
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
-	preprocessed.Branch("obs_thrown", obs_thrown, "obs_thrown/D")
 	preprocessed.Branch("pt_hat_weight", pt_hat_weight, "pt_hat_weight/D")
 	preprocessed.Branch("event_n", event_n, "event_n/D")
     
@@ -172,7 +172,7 @@ def main():
             
 			# smearing + track efficiency
 			obs_pt[0] = -9999
-			if do_keep_track(part):
+			if args.tr_eff_off or do_keep_track(part):
 				smeared_part = smear_track(part, 0.01)
 				parts_pythia_p_smeared.push_back(smeared_part)
 				obs_pt[0] = smeared_part.perp()
@@ -209,8 +209,8 @@ def main():
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
 			for i in range(len(EEC_rs)):
-				event_index1 = _v[EEC_indicies1[i]].user_index()
-				event_index2 = _v[EEC_indicies2[i]].user_index()
+				event_index1 = _v[int(EEC_indicies1[i])].user_index()
+				event_index2 = _v[int(EEC_indicies2[i])].user_index()
 				truth_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
 
 		############################# SMEARED PAIRS ################################
@@ -242,8 +242,8 @@ def main():
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
 			for i in range(len(EEC_rs)):
-				event_index1 = _v[EEC_indicies1[i]].user_index()
-				event_index2 = _v[EEC_indicies2[i]].user_index()
+				event_index1 = _v[int(EEC_indicies1[i])].user_index()
+				event_index2 = _v[int(EEC_indicies2[i])].user_index()
 				smeared_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
 				
 		########################## TTree output generation #########################
@@ -253,7 +253,6 @@ def main():
 			gen_energy_weight[0] = t_pair.weight
 			gen_R_L[0] = t_pair.r
 			gen_jet_pt[0] = t_pair.pt
-			obs_thrown[0] = 0
 
 			match_found = False
 			for s_pair in smeared_pairs:
@@ -268,7 +267,6 @@ def main():
 				obs_energy_weight[0] = dummyval
 				obs_R_L[0] = dummyval
 				obs_jet_pt[0] = dummyval
-				obs_thrown[0] = 1
 				preprocessed.Fill()
 
 		# fill jet resolution debug ttree
