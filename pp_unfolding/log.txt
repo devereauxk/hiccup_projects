@@ -1,0 +1,226 @@
+
+ *------------------------------------------------------------------------------------* 
+ |                                                                                    | 
+ |  *------------------------------------------------------------------------------*  | 
+ |  |                                                                              |  | 
+ |  |                                                                              |  | 
+ |  |   PPP   Y   Y  TTTTT  H   H  III    A      Welcome to the Lund Monte Carlo!  |  | 
+ |  |   P  P   Y Y     T    H   H   I    A A     This is PYTHIA version 8.244      |  | 
+ |  |   PPP     Y      T    HHHHH   I   AAAAA    Last date of change: 20 Dec 2019  |  | 
+ |  |   P       Y      T    H   H   I   A   A                                      |  | 
+ |  |   P       Y      T    H   H  III  A   A    Now is 21 Aug 2023 at 15:16:43    |  | 
+ |  |                                                                              |  | 
+ |  |   Christian Bierlich;  Department of Astronomy and Theoretical Physics,      |  | 
+ |  |      Lund University, Solvegatan 14A, SE-223 62 Lund, Sweden;                |  | 
+ |  |      e-mail: christian.bierlich@thep.lu.se                                   |  | 
+ |  |   Nishita Desai;  Department of Theoretical Physics, Tata Institute,         |  | 
+ |  |      Homi Bhabha Road, Mumbai 400005, India;                                 |  | 
+ |  |      e-mail: desai@theory.tifr.res.in                                        |  | 
+ |  |   Ilkka Helenius;  Department of Physics, University of Jyvaskyla,           |  | 
+ |  |      P.O. Box 35, FI-40014 University of Jyvaskyla, Finland;                 |  | 
+ |  |      e-mail: ilkka.m.helenius@jyu.fi                                         |  | 
+ |  |   Philip Ilten;  School of Physics and Astronomy,                            |  | 
+ |  |      University of Birmingham, Birmingham, B152 2TT, UK;                     |  | 
+ |  |      e-mail: philten@cern.ch                                                 |  | 
+ |  |   Leif Lonnblad;  Department of Astronomy and Theoretical Physics,           |  | 
+ |  |      Lund University, Solvegatan 14A, SE-223 62 Lund, Sweden;                |  | 
+ |  |      e-mail: leif.lonnblad@thep.lu.se                                        |  | 
+ |  |   Stephen Mrenna;  Computing Division, Simulations Group,                    |  | 
+ |  |      Fermi National Accelerator Laboratory, MS 234, Batavia, IL 60510, USA;  |  | 
+ |  |      e-mail: mrenna@fnal.gov                                                 |  | 
+ |  |   Stefan Prestel;  Department of Astronomy and Theoretical Physics,          |  | 
+ |  |      Lund University, Solvegatan 14A, SE-223 62 Lund, Sweden;                |  | 
+ |  |      e-mail: stefan.prestel@thep.lu.se                                       |  | 
+ |  |   Christine O. Rasmussen;  Department of Astronomy and Theoretical Physics,  |  | 
+ |  |      Lund University, Solvegatan 14A, SE-223 62 Lund, Sweden;                |  | 
+ |  |      e-mail: christine.rasmussen@thep.lu.se                                  |  | 
+ |  |   Torbjorn Sjostrand;  Department of Astronomy and Theoretical Physics,      |  | 
+ |  |      Lund University, Solvegatan 14A, SE-223 62 Lund, Sweden;                |  | 
+ |  |      e-mail: torbjorn@thep.lu.se                                             |  | 
+ |  |   Peter Skands;  School of Physics,                                          |  | 
+ |  |      Monash University, PO Box 27, 3800 Melbourne, Australia;                |  | 
+ |  |      e-mail: peter.skands@monash.edu                                         |  | 
+ |  |                                                                              |  | 
+ |  |   The main program reference is 'An Introduction to PYTHIA 8.2',             |  | 
+ |  |   T. Sjostrand et al, Comput. Phys. Commun. 191 (2015) 159                   |  | 
+ |  |   [arXiv:1410.3012 [hep-ph]]                                                 |  | 
+ |  |                                                                              |  | 
+ |  |   The main physics reference is the 'PYTHIA 6.4 Physics and Manual',         |  | 
+ |  |   T. Sjostrand, S. Mrenna and P. Skands, JHEP05 (2006) 026 [hep-ph/0603175]  |  | 
+ |  |                                                                              |  | 
+ |  |   An archive of program versions and documentation is found on the web:      |  | 
+ |  |   http://www.thep.lu.se/Pythia                                               |  | 
+ |  |                                                                              |  | 
+ |  |   This program is released under the GNU General Public Licence version 2.   |  | 
+ |  |   Please respect the MCnet Guidelines for Event Generator Authors and Users. |  | 
+ |  |                                                                              |  | 
+ |  |   Disclaimer: this program comes without any guarantees.                     |  | 
+ |  |   Beware of errors and use common sense when interpreting results.           |  | 
+ |  |                                                                              |  | 
+ |  |   Copyright (C) 2019 Torbjorn Sjostrand                                      |  | 
+ |  |                                                                              |  | 
+ |  |                                                                              |  | 
+ |  *------------------------------------------------------------------------------*  | 
+ |                                                                                    | 
+ *------------------------------------------------------------------------------------* 
+
+
+ *-------  PYTHIA Process Initialization  --------------------------*
+ |                                                                  |
+ | We collide p+ with p+ at a CM energy of 5.020e+03 GeV            |
+ |                                                                  |
+ |------------------------------------------------------------------|
+ |                                                    |             |
+ | Subprocess                                    Code |   Estimated |
+ |                                                    |    max (mb) |
+ |                                                    |             |
+ |------------------------------------------------------------------|
+ |                                                    |             |
+ | g g -> g g                                     111 |   6.403e-01 |
+ | g g -> q qbar (uds)                            112 |   8.519e-03 |
+ | q g -> q g                                     113 |   5.189e-01 |
+ | q q(bar)' -> q q(bar)'                         114 |   6.270e-02 |
+ | q qbar -> g g                                  115 |   5.019e-04 |
+ | q qbar -> q' qbar' (uds)                       116 |   2.280e-04 |
+ | g g -> c cbar                                  121 |   2.811e-03 |
+ | q qbar -> c cbar                               122 |   7.553e-05 |
+ | g g -> b bbar                                  123 |   2.508e-03 |
+ | q qbar -> b bbar                               124 |   7.143e-05 |
+ |                                                                  |
+ *-------  End PYTHIA Process Initialization -----------------------*
+
+ *-------  PYTHIA Multiparton Interactions Initialization  ---------* 
+ |                                                                  | 
+ |                   sigmaNonDiffractive =    47.72 mb              | 
+ |                                                                  | 
+ |    pT0 =  2.12 gives sigmaInteraction =   208.84 mb: accepted    | 
+ |                                                                  | 
+ *-------  End PYTHIA Multiparton Interactions Initialization  -----* 
+
+ *-------  PYTHIA Flag + Mode + Parm + Word + FVec + MVec + PVec + WVec Settings (changes only)  ------------------* 
+ |                                                                                                                 | 
+ | Name                                          |                      Now |      Default         Min         Max | 
+ |                                               |                          |                                      | 
+ | Beams:eCM                                     |                 5020.000 |    14000.000    10.00000             | 
+ | HardQCD:all                                   |                       on |          off                         | 
+ | Next:numberCount                              |                        0 |         1000           0             | 
+ | Next:numberShowEvent                          |                        0 |            1           0             | 
+ | Next:numberShowInfo                           |                        0 |            1           0             | 
+ | Next:numberShowProcess                        |                        0 |            1           0             | 
+ | PhaseSpace:pTHatMin                           |                 20.00000 |          0.0         0.0             | 
+ | StringPT:sigma                                |                  0.20000 |      0.33500         0.0     1.00000 | 
+ |                                                                                                                 | 
+ *-------  End PYTHIA Flag + Mode + Parm + Word + FVec + MVec + PVec + WVec Settings  -----------------------------* 
+
+ --------  PYTHIA Particle Data Table (changed only)  ------------------------------------------------------------------------------
+ 
+      id   name            antiName         spn chg col      m0        mWidth      mMin       mMax       tau0    res dec ext vis wid
+             no onMode   bRatio   meMode     products 
+
+ no particle data has been changed from its default value 
+
+ --------  End PYTHIA Particle Data Table  -----------------------------------------------------------------------------------------
+
+#--------------------------------------------------------------------------
+#                         FastJet release 3.3.4
+#                 M. Cacciari, G.P. Salam and G. Soyez                  
+#     A software package for jet finding and analysis at colliders      
+#                           http://fastjet.fr                           
+#	                                                                      
+# Please cite EPJC72(2012)1896 [arXiv:1111.6097] if you use this package
+# for scientific work and optionally PLB641(2006)57 [hep-ph/0512210].   
+#                                                                       
+# FastJet is provided without warranty under the GNU GPL v2 or higher.  
+# It uses T. Chan's closest pair algorithm, S. Fortune's Voronoi code
+# and 3rd party plugin jet algorithms. See COPYING file for details.
+#--------------------------------------------------------------------------
+['HardQCD:all=on', 'PhaseSpace:pTHatMin = 20.0', 'Beams:eCM = 5020.0']
+[i] strings read to PYTHIA  [['HardQCD:all=on', 'PhaseSpace:pTHatMin = 20.0', 'Beams:eCM = 5020.0', 'StringPT:sigma=0.2', 'Next:numberCount = 0', 'Next:numberShowEvent = 0', 'Next:numberShowInfo = 0', 'Next:numberShowProcess = 0', 'Stat:showProcessLevel = on']]
+[i] pythia initialized with ['HardQCD:all=on', 'PhaseSpace:pTHatMin = 20.0', 'Beams:eCM = 5020.0', 'StringPT:sigma=0.2', 'Next:numberCount = 0', 'Next:numberShowEvent = 0', 'Next:numberShowInfo = 0', 'Next:numberShowProcess = 0', 'Stat:showProcessLevel = on']
+
+Longitudinally invariant anti-kt algorithm with R = 0.4 and E scheme recombination
+ PYTHIA Warning in StringFragmentation::fragmentToJunction: bad convergence junction rest frame  
+
+ *-------  PYTHIA Event and Cross Section Statistics  -------------------------------------------------------------*
+ |                                                                                                                 |
+ | Subprocess                                    Code |            Number of events       |      sigma +- delta    |
+ |                                                    |       Tried   Selected   Accepted |     (estimated) (mb)   |
+ |                                                    |                                   |                        |
+ |-----------------------------------------------------------------------------------------------------------------|
+ |                                                    |                                   |                        |
+ | g g -> g g                                     111 |         375         52         52 |   9.226e-02  6.360e-03 |
+ | g g -> q qbar (uds)                            112 |           2          1          1 |   2.617e-03  2.617e-03 |
+ | q g -> q g                                     113 |         290         42         42 |   6.756e-02  5.844e-03 |
+ | q q(bar)' -> q q(bar)'                         114 |          30          1          1 |   7.153e-03  7.153e-03 |
+ | q qbar -> g g                                  115 |           1          1          1 |   1.685e-04  1.685e-04 |
+ | q qbar -> q' qbar' (uds)                       116 |           0          0          0 |   0.000e+00  0.000e+00 |
+ | g g -> c cbar                                  121 |           4          2          2 |   1.156e-03  3.894e-04 |
+ | q qbar -> c cbar                               122 |           0          0          0 |   0.000e+00  0.000e+00 |
+ | g g -> b bbar                                  123 |           1          1          1 |   2.383e-03  2.383e-03 |
+ | q qbar -> b bbar                               124 |           0          0          0 |   0.000e+00  0.000e+00 |
+ |                                                    |                                   |                        |
+ | sum                                                |         703        100        100 |   1.733e-01  1.177e-02 |
+ |                                                                                                                 |
+ *-------  End PYTHIA Event and Cross Section Statistics ----------------------------------------------------------*
+
+ *-------  PYTHIA Error and Warning Messages Statistics  ----------------------------------------------------------* 
+ |                                                                                                                 | 
+ |  times   message                                                                                                | 
+ |                                                                                                                 | 
+ |      2   Warning in StringFragmentation::fragmentToJunction: bad convergence junction rest frame                | 
+ |                                                                                                                 | 
+ *-------  End PYTHIA Error and Warning Messages Statistics  ------------------------------------------------------* 
+************************************************************************************************************
+*    Row   * gen_energ * gen_R_L.g * gen_jet_p * obs_energ * obs_R_L.o * obs_jet_p * pt_hat_we * event_n.e *
+************************************************************************************************************
+*        0 * 0.0038256 *         0 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        1 * 0.0008859 * 0.5326199 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        2 * 0.0008294 * 0.5251437 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        3 * 0.0032483 * 0.2475246 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        4 * 0.0065224 * 0.4319140 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        5 * 0.0052141 * 0.3608859 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        6 * 0.0041601 * 0.4328822 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        7 * 0.0289602 * 0.3615270 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        8 * 0.0083475 * 0.3478867 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*        9 * 0.0008859 * 0.5326199 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       10 * 0.0002051 *         0 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       11 * 0.0001920 * 0.1077422 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       12 * 0.0007522 * 0.3033033 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       13 * 0.0015104 * 0.1421295 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       14 * 0.0012074 * 0.2070362 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       15 * 0.0009633 * 0.1129514 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       16 * 0.0067065 * 0.1717508 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       17 * 0.0019330 * 0.1848247 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       18 * 0.0008294 * 0.5251437 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       19 * 0.0001920 * 0.1077422 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       20 * 0.0001798 *         0 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       21 * 0.0007042 * 0.2792055 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       22 * 0.0014141 * 0.0932722 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       23 * 0.0011305 * 0.1663857 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       24 * 0.0009019 * 0.1023817 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       25 * 0.0062789 * 0.1794509 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       26 * 0.0018098 * 0.1999915 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       27 * 0.0032483 * 0.2475246 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       28 * 0.0007522 * 0.3033033 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       29 * 0.0007042 * 0.2792055 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       30 * 0.0027581 *         0 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       31 * 0.0055381 * 0.1860796 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       32 * 0.0044273 * 0.1135436 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       33 * 0.0035323 * 0.1940417 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       34 * 0.0245901 * 0.1365322 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       35 * 0.0070879 * 0.1331989 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       36 * 0.0065224 * 0.4319140 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       37 * 0.0015104 * 0.1421295 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       38 * 0.0014141 * 0.0932722 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       39 * 0.0055381 * 0.1860796 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       40 * 0.0111202 *         0 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       41 * 0.0088897 * 0.0742758 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       42 * 0.0070927 * 0.0428138 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       43 * 0.0493752 * 0.0986841 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       44 * 0.0142320 * 0.1204248 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       45 * 0.0052141 * 0.3608859 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       46 * 0.0012074 * 0.2070362 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       47 * 0.0011305 * 0.1663857 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       48 * 0.0044273 * 0.1135436 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+*       49 * 0.0088897 * 0.0742758 * 38.481550 *     -9999 *     -9999 *     -9999 * 1.612e-06 *        12 *
+************************************************************************************************************
