@@ -112,6 +112,7 @@ theta0 = synth_df[all_features].to_numpy()
 
 
 ############# RL cut
+"""
 RL_min = 5 * (10**-3)
 
 for row in theta_unknown:    
@@ -121,6 +122,7 @@ for row in theta_unknown:
 for row in theta0:    
     if row[4] < RL_min:
         row[3:] = [-9999 for i in range(3)]
+        """
 
 
 
@@ -233,11 +235,11 @@ elif flags.level == 'jet':
     # theta_unknown = theta_unknown[theta_unknown[:,0,4] != -1]
     # theta0 = theta0[theta0[:,0,4] != -1]
     
-    theta_unknown_G = theta_unknown[:, :, 0:3]
-    theta_unknown_S = theta_unknown[:, :, 3:7]
+    theta_unknown_G = theta_unknown[:, :, 0:2]
+    theta_unknown_S = theta_unknown[:, :, 3:5]
 
-    theta0_G = theta0[:, :, 0:3]
-    theta0_S = theta0[:, :, 3:7]
+    theta0_G = theta0[:, :, 0:2]
+    theta0_S = theta0[:, :, 3:5]
     
 
     """
@@ -309,7 +311,7 @@ N = len(obs_features)
 
 binning = [np.logspace(-5,0,100),np.logspace(-4,0,100),np.linspace(20,40,100)]
 
-fig, axes = plt.subplots(1, 3, figsize=(15,4))
+fig, axes = plt.subplots(1, 2, figsize=(15,4))
 
 for i,ax in enumerate(axes.ravel()):
     if (i >= N): break
@@ -338,7 +340,7 @@ plt.close()
 
 binning = [np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100)]
 
-fig, axes = plt.subplots(1, 3, figsize=(15,4))
+fig, axes = plt.subplots(1, 2, figsize=(15,4))
 
 for i,ax in enumerate(axes.ravel()):
     if (i >= N): break
@@ -399,8 +401,8 @@ print("multifolded weights")
 print(myweights)
 print(myweights.shape)
 
-flattened_weights = of.flatten_weights(myweights, theta0_G, level=flags.level)
-flattened_weights_reco = of.flatten_weights(myweights, theta0_S, level=flags.level)
+flattened_weights = of.flatten_weights(myweights, theta0_G, level=flags.level, dim=2)
+flattened_weights_reco = of.flatten_weights(myweights, theta0_S, level=flags.level, dim=2)
 
 print(80*'#')
 print("flattened weights")
@@ -415,11 +417,11 @@ N_Iterations = myweights.shape[0] # opt['General']['NITER']
 # individual distros
 
 for iteration in range(N_Iterations):
-    fig, axes = plt.subplots(3, 3, figsize=(15,11))
+    fig, axes = plt.subplots(3, 2, figsize=(15,11))
     
     # ROW 1: raw distributions
     binning = [np.logspace(-5,0,100),np.logspace(-4,0,100),np.linspace(20,40,100)]
-    for i in range(3):
+    for i in range(2):
         ax = axes[0, i]
 
         tiv = lambda x : inverses[i](flatten(x, level=flags.level))
@@ -439,7 +441,7 @@ for iteration in range(N_Iterations):
             ax.set_yscale('log')
             
     # ROW 2: residual plots
-    for i in range(3):
+    for i in range(2):
         ax = axes[1, i]
 
         tiv = lambda x : inverses[i](flatten(x, level=flags.level))
@@ -471,7 +473,7 @@ for iteration in range(N_Iterations):
             
     # ROW 3: distributions, preprocessed inputs (gaussians)
     binning = [np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100),np.linspace(-0.2,1.2,100)]
-    for i in range(3):
+    for i in range(2):
         ax = axes[2, i]
 
         tiv = lambda x : flatten(x, level=flags.level)
@@ -526,6 +528,21 @@ for iteration in range(N_Iterations-1):
         
 fig.tight_layout()
 fig.savefig("weights_step2_" + flags.suffix + ".png")
+plt.close()
+
+
+plt.rcParams["font.family"] = "serif"
+
+for iteration in range(N_Iterations):
+    plt.hist(myweights[iteration, 1, :], bins=50, range=(0, 4), histtype='step', stacked=True, fill=False, label="iteration "+str(iteration)+", step 2")
+
+plt.xlabel('weight value')
+plt.ylabel('counts')
+plt.legend(loc='upper right', fontsize=10, frameon=False)
+plt.title("step 2 weight distribution")
+axes = plt.gca()
+fig = plt.gcf()
+fig.savefig("weights_hist_" + flags.suffix + ".png")
 plt.close()
 
 

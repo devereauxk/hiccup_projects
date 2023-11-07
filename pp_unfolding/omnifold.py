@@ -15,12 +15,12 @@ from dense import MLP
 
 dummyval = -1
 
-def flatten_weights(weights, theta0_G, level='pair'):
+def flatten_weights(weights, theta0_G, level='pair', dim=3):
     if level == 'pair':
         return weights
     
     # assumes jet- or event-level 3D unfolding
-    flat_theta0_G = theta0_G.reshape(-1,3)
+    flat_theta0_G = theta0_G.reshape(-1,dim)
     mask = flat_theta0_G[:,0] >= 0
     flat_weights = np.repeat(weights, theta0_G.shape[1], axis=2)
     return flat_weights[:,:,mask]
@@ -161,7 +161,7 @@ class Multifold():
             np.concatenate((np.zeros(len(self.mc_reco[self.mc_pass_reco])), np.ones(len(self.data[self.data_pass_reco])))),
             np.concatenate((self.weights_push[self.mc_pass_reco], np.ones(len(self.data[self.data_pass_reco]))))
         )
-                
+
         # self.weights_pull = self.weights_push * self.reweight(self.mc_reco,self.model)
         self.weights_pull[self.mc_pass_reco] = self.weights_push[self.mc_pass_reco] * self.reweight(self.mc_reco[self.mc_pass_reco],self.model)
         
@@ -172,14 +172,14 @@ class Multifold():
         # Another option is to assign the average weight: <w|x_true>.  To do this, we need to estimate this quantity.
         num_not_pass_reco = self.mc_gen[self.not_mc_pass_reco].shape[0]
         print("percentage mc not passing reco = " + str(num_not_pass_reco) + "/" + str(self.mc_reco.shape[0]) + " = " + str(num_not_pass_reco/self.mc_reco.shape[0]))
-              
+        
         if (num_not_pass_reco > 0):
             print("RUNNING STEP 1B")
             
             """
             self.weights_pull[self.not_mc_pass_reco] = 1
             """
-            
+        
             """
             self.RunModel_New(
                 np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
@@ -192,8 +192,7 @@ class Multifold():
             self.weights_pull[self.not_mc_pass_reco] = average_vals
 
             """
-
-            
+            """
             self.RunModel_Old(
                 np.concatenate((self.mc_gen[self.mc_pass_reco], self.mc_gen[self.mc_pass_reco])),
                 np.concatenate((np.ones(len(self.mc_gen[self.mc_pass_reco])), np.zeros(len(self.mc_gen[self.mc_pass_reco])))),
@@ -202,6 +201,7 @@ class Multifold():
 
             average_vals = self.reweight(self.mc_gen[self.not_mc_pass_reco], self.model)
             self.weights_pull[self.not_mc_pass_reco] = average_vals
+            """
         
             
             # end of STEP 1B
@@ -213,6 +213,9 @@ class Multifold():
     def RunStep2(self,i):
         '''Gen to Gen reweighing'''        
         print("RUNNING STEP 2")
+        
+        self.weights[i, 1:2, :] = self.weights_push
+        return
         
         
         self.RunModel_Old(
