@@ -57,10 +57,9 @@ def do_keep_track(part):
     bin_index = np.digitize(part.perp(), tr_eff[1]) - 1
     keep_prob = tr_eff[0][bin_index]
     return np.random.choice([0, 1], p=[1 - keep_prob, keep_prob])
-
+    
 def get_delta_R(pj1, pj2):
-    return np.sqrt( (pj1.eta() - pj2.eta())**2 + (pj1.phi() - pj2.phi())**2)
-
+	return np.sqrt( (pj1.eta() - pj2.eta())**2 + (pj1.phi() - pj2.phi())**2)
 
 def get_args_from_settings(ssettings):
 	sys.argv = sys.argv + ssettings.split()
@@ -69,9 +68,9 @@ def get_args_from_settings(ssettings):
 	parser.add_argument('--output', default="test_ecorrel_rw.root", type=str)
 	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
 	parser.add_argument('--tr_eff_off', action='store_true', default=False)
-    parser.add_argument('--no_smear', action='store_false', default=True)
-    args = parser.parse_args()
-    return args
+	parser.add_argument('--no_smear', action='store_false', default=True)
+	args = parser.parse_args()
+	return args
 
 
 def main():
@@ -100,18 +99,18 @@ def main():
 	fout.cd()
 
 	# output histogram defintions
-    nbins = 30
-    lbins = logbins(1.e-3, 1, nbins)
+	nbins = 30
+	lbins = logbins(1.e-3, 1, nbins)
     
-    n_pt_bins = 4
-    jet_pt_lo = [20, 25, 30, 20]
-    jet_pt_hi = [25, 30, 40, 40]
+	n_pt_bins = 4
+	jet_pt_lo = [20, 25, 30, 20]
+	jet_pt_hi = [25, 30, 40, 40]
     
-    h_jetshape_pt = []
-    for i in range(len(jet_pt_lo)):
-        h_jetshape = ROOT.TH1D('h_jetshape_pt_{}'.format(i), 'h_jetshape_pt_{}'.format(i), nbins, lbins)
-        h.Sumw2()
-        h_jetshape_pt.append(h_jetshape)
+	h_jetshape_pt = []
+	for i in range(len(jet_pt_lo)):
+		h_jetshape = ROOT.TH1D('h_jetshape_pt_{}'.format(i), 'h_jetshape_pt_{}'.format(i), nbins, lbins)
+		h.Sumw2()
+		h_jetshape_pt.append(h_jetshape)
     
 
     # PYTHIA EVENT-BY-EVENT GENERATION
@@ -139,22 +138,22 @@ def main():
 		parts_pythia_p_selected = parts_selector(parts_pythia_p)
 
         # only select charged particles
-        charged_parts = fj.vectorPJ()
-        for part in parts_pythia_p_selected:
-            if part.charge() != 0:
-                charged_parts.push_back(part)
-        parts_pythia_p_selected = charged_parts
+		charged_parts = fj.vectorPJ()
+		for part in parts_pythia_p_selected:
+			if part.charge() != 0:
+				charged_parts.push_back(part)
+			parts_pythia_p_selected = charged_parts
         
 		# apply realistic ALICE detector effects (smearing) if no_smear is not true
-        if not args.no_smear:
-            parts_pythia_p_smeared = fj.vectorPJ()
-            for part in parts_pythia_p_selected:
+		if not args.no_smear:
+			parts_pythia_p_smeared = fj.vectorPJ()
+			for part in parts_pythia_p_selected:
                 # smearing + track efficiency
-                if args.tr_eff_off or do_keep_track(part):
-                    smeared_part = smear_track(part, 0.01)
-                    parts_pythia_p_smeared.push_back(smeared_part)
-
-            parts_pythia_p_selected = parts_pythia_p_smeared
+				if args.tr_eff_off or do_keep_track(part):
+					smeared_part = smear_track(part, 0.01)
+					parts_pythia_p_smeared.push_back(smeared_part)
+			
+			parts_pythia_p_selected = parts_pythia_p_smeared
             
 		############################# PAIR CONSTITUENTS AND JET AXIS ################################
 		# jet reconstruction
@@ -166,14 +165,13 @@ def main():
    			# push constutents to a vector in python
 			_v = fj.vectorPJ()
 			_ = [_v.push_back(c) for c in j.constituents()]
-            
-            delta_Rs = [get_delta_R(const, j) for const in _v]
+			delta_Rs = [get_delta_R(const, j) for const in _v]
             
             # fill histograms
-            for i in n_pt_bins:
-                if jet_pt_lo[i] < jet_pt and jet_pt < jet_pt_hi[i]:
-                    for delta_R in delta_Rs:
-                        h_jetshape_pt[i].Fill(delta_R)
+			for i in n_pt_bins:
+				if jet_pt_lo[i] < jet_pt and jet_pt < jet_pt_hi[i]:
+					for delta_R in delta_Rs:
+						h_jetshape_pt[i].Fill(delta_R)
                         
         #################################################################################
 
@@ -181,9 +179,9 @@ def main():
 
 	# write histograms to output file
 	for h in h_jetshape_pt:
-        intg = h.GetEntries()
-        h.Scale(1/intg)
-        h.Write()
+		intg = h.GetEntries()
+		h.Scale(1/intg)
+		h.Write()
 
 	# output file you want to write to
 	fout.Write()
