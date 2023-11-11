@@ -109,18 +109,14 @@ def main():
 	h_jetshape_pt = []
 	for i in range(len(jet_pt_lo)):
 		h_jetshape = ROOT.TH1D('h_jetshape_pt_{}'.format(i), 'h_jetshape_pt_{}'.format(i), nbins, lbins)
-		h.Sumw2()
+		h_jetshape.Sumw2()
 		h_jetshape_pt.append(h_jetshape)
     
 
     # PYTHIA EVENT-BY-EVENT GENERATION
-	event_n[0] = 0
 	for n in tqdm(range(args.nev)):
 		if not pythia_hard.next():
 				continue
-		
-		# count events
-		event_n[0] += 1
 		
 		# find weight from yaml file for this pthat
 		pthat = pythia_hard.info.pTHat()
@@ -129,20 +125,16 @@ def main():
 			if pthat >= pt_hat_yaml[i] and pthat < pt_hat_yaml[i+1]:
 				pt_hat_bin = i
 				break
-		pt_hat_weight[0] = pt_hat_yaml[pt_hat_bin]
 		
 		#======================================
 		#            Particle level
 		#======================================
 		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal], 0, True)
-		parts_pythia_p_selected = parts_selector(parts_pythia_p)
-
-        # only select charged particles
-		charged_parts = fj.vectorPJ()
-		for part in parts_pythia_p_selected:
-			if part.charge() != 0:
-				charged_parts.push_back(part)
-			parts_pythia_p_selected = charged_parts
+        
+        # add in charged particle selector at fj level
+        charged_selector = fj.SelectorIsCharged()
+        
+		parts_pythia_p_selected = charged_selector(parts_selector(parts_pythia_p))
         
 		# apply realistic ALICE detector effects (smearing) if no_smear is not true
 		if not args.no_smear:
