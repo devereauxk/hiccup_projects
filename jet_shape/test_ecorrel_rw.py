@@ -132,7 +132,7 @@ def main():
 		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal], 0, True)
         
         # add in charged particle selector at fj level
-        charged_selector = fj.SelectorIsCharged()
+		charged_selector = fj.SelectorIsCharged()
         
 		parts_pythia_p_selected = charged_selector(parts_selector(parts_pythia_p))
         
