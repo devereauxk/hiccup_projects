@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# python3 test_ecorrel_rw.py --nev 100 --output "test_preprocess.root" > log.txt
+# python3 test_ecorrel_rw.py --nev 100000 --no_smear --output "test_preprocess.root"
 
 from pyjetty.mputils.mputils import logbins
 import operator as op
@@ -33,11 +33,6 @@ import numpy as np
 import uproot as ur
 import yaml
 
-with open("./scaleFactors.yaml", 'r') as stream:
-	pt_hat_yaml = yaml.safe_load(stream)
-pt_hat_lo = pt_hat_yaml["bin_lo"]
-pt_hat_hi = pt_hat_yaml["bin_hi"]
-
 # load track efficiency tree
 tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
@@ -57,9 +52,6 @@ def do_keep_track(part):
     bin_index = np.digitize(part.perp(), tr_eff[1]) - 1
     keep_prob = tr_eff[0][bin_index]
     return np.random.choice([0, 1], p=[1 - keep_prob, keep_prob])
-    
-def get_delta_R(pj1, pj2):
-	return np.sqrt( (pj1.eta() - pj2.eta())**2 + (pj1.phi() - pj2.phi())**2)
 
 def get_args_from_settings(ssettings):
 	sys.argv = sys.argv + ssettings.split()
@@ -76,15 +68,15 @@ def get_args_from_settings(ssettings):
 def main():
 	mycfg = []
 	mycfg.append("StringPT:sigma=0.335") # for producing slightly different data sets, default is 0.335 GeV
-	ssettings = "--py-ecm 5020 --py-pthatmin 20"
+	ssettings = "--py-ecm 14000 --py-pthatmin 100"
 	args = get_args_from_settings(ssettings)
 	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
 	
 	max_eta_hadron = 0.9  # ALICE
-	jet_R0 = 0.4
+	jet_R0 = 0.4   # R=0.4 standard
 	max_eta_jet = max_eta_hadron - jet_R0
 	parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
-	jet_selector = fj.SelectorPtMin(20) & fj.SelectorPtMax(40) & fj.SelectorAbsEtaMax(max_eta_jet) 
+	jet_selector = fj.SelectorPtMin(100) & fj.SelectorPtMax(120) & fj.SelectorAbsEtaMax(max_eta_jet) 
 	pfc_selector0 = fj.SelectorPtMin(0.)
 	pfc_selector1 = fj.SelectorPtMin(1.)
 
@@ -99,16 +91,13 @@ def main():
 	fout.cd()
 
 	# output histogram defintions
-	nbins = 30
-	lbins = logbins(1.e-3, 1, nbins)
-    
 	n_pt_bins = 4
-	jet_pt_lo = [20, 25, 30, 20]
-	jet_pt_hi = [25, 30, 40, 40]
+	jet_pt_lo = np.array([20, 100, 500, 1000])
+	jet_pt_hi = np.array([30, 120, 550, 1100])
     
 	h_jetshape_pt = []
 	for i in range(len(jet_pt_lo)):
-		h_jetshape = ROOT.TH1D('h_jetshape_pt_{}'.format(i), 'h_jetshape_pt_{}'.format(i), nbins, lbins)
+		h_jetshape = ROOT.TH1D('h_jetshape_pt_{}'.format(i), 'h_jetshape_pt_{}'.format(i), 25, 0, jet_R0)
 		h_jetshape.Sumw2()
 		h_jetshape_pt.append(h_jetshape)
     
@@ -118,34 +107,11 @@ def main():
 		if not pythia_hard.next():
 				continue
 		
-		# find weight from yaml file for this pthat
-		pthat = pythia_hard.info.pTHat()
-		pt_hat_bin = len(pt_hat_lo) # 1-indexed
-		for i in range(1,len(pt_hat_lo)):
-			if pthat >= pt_hat_yaml[i] and pthat < pt_hat_yaml[i+1]:
-				pt_hat_bin = i
-				break
-		
 		#======================================
 		#            Particle level
 		#======================================
-		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal], 0, True)
-        
-        # add in charged particle selector at fj level
-		charged_selector = fj.SelectorIsCharged()
-        
-		parts_pythia_p_selected = charged_selector(parts_selector(parts_pythia_p))
-        
-		# apply realistic ALICE detector effects (smearing) if no_smear is not true
-		if not args.no_smear:
-			parts_pythia_p_smeared = fj.vectorPJ()
-			for part in parts_pythia_p_selected:
-                # smearing + track efficiency
-				if args.tr_eff_off or do_keep_track(part):
-					smeared_part = smear_track(part, 0.01)
-					parts_pythia_p_smeared.push_back(smeared_part)
-			
-			parts_pythia_p_selected = parts_pythia_p_smeared
+		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal, pythiafjext.kCharged], 0, True)
+		parts_pythia_p_selected = parts_selector(parts_pythia_p)
             
 		############################# PAIR CONSTITUENTS AND JET AXIS ################################
 		# jet reconstruction
@@ -153,17 +119,12 @@ def main():
 
 		for j in jets_p:
 			jet_pt = j.perp() # jet pt
-
-   			# push constutents to a vector in python
-			_v = fj.vectorPJ()
-			_ = [_v.push_back(c) for c in j.constituents()]
-			delta_Rs = [get_delta_R(const, j) for const in _v]
-            
-            # fill histograms
-			for i in n_pt_bins:
-				if jet_pt_lo[i] < jet_pt and jet_pt < jet_pt_hi[i]:
-					for delta_R in delta_Rs:
-						h_jetshape_pt[i].Fill(delta_R)
+			
+			# fill histograms
+			for c in j.constituents():
+				for i in range(n_pt_bins):
+					if jet_pt_lo[i] < jet_pt and jet_pt < jet_pt_hi[i]:
+						h_jetshape_pt[i].Fill(j.delta_R(c))
                         
         #################################################################################
 
@@ -172,7 +133,8 @@ def main():
 	# write histograms to output file
 	for h in h_jetshape_pt:
 		intg = h.GetEntries()
-		h.Scale(1/intg)
+		if intg > 0:
+			h.Scale(1/intg)
 		h.Write()
 
 	# output file you want to write to
