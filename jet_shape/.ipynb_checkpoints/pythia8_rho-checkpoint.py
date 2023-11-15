@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# python3 test_ecorrel_rw.py --nev 100000 --no_smear --output "test_preprocess.root"
+# python3 pythia8_rho.py --nev 100000 --no_smear --output "R0p4.root"
 
 from pyjetty.mputils.mputils import logbins
 import operator as op
@@ -36,7 +36,6 @@ import yaml
 # load track efficiency tree
 tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
-
 
 def smear_track(part, sigma=0.01):
 	pt = part.perp() * (1 + np.random.normal(0, sigma))
@@ -76,7 +75,7 @@ def main():
 	jet_R0 = 0.4   # R=0.4 standard
 	max_eta_jet = max_eta_hadron - jet_R0
 	parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
-	jet_selector = fj.SelectorPtMin(100) & fj.SelectorPtMax(120) & fj.SelectorAbsEtaMax(max_eta_jet) 
+	jet_selector = fj.SelectorAbsEtaMax(max_eta_jet) & fj.SelectorPtMin(20) # & fj.SelectorPtMax(120)
 	pfc_selector0 = fj.SelectorPtMin(0.)
 	pfc_selector1 = fj.SelectorPtMin(1.)
 
@@ -95,12 +94,12 @@ def main():
 	jet_pt_lo = np.array([20, 100, 500, 1000])
 	jet_pt_hi = np.array([30, 120, 550, 1100])
     
+	h_jetpt = ROOT.TH1D('h_jetpt', 'h_jetpt', 232, 20, 1200)
 	h_jetshape_pt = []
 	for i in range(len(jet_pt_lo)):
 		h_jetshape = ROOT.TH1D('h_jetshape_pt_{}'.format(i), 'h_jetshape_pt_{}'.format(i), 25, 0, jet_R0)
 		h_jetshape.Sumw2()
 		h_jetshape_pt.append(h_jetshape)
-    
 
     # PYTHIA EVENT-BY-EVENT GENERATION
 	for n in tqdm(range(args.nev)):
@@ -120,12 +119,13 @@ def main():
 		for j in jets_p:
 			jet_pt = j.perp() # jet pt
 			
+			h_jetpt.Fill(jet_pt)
+			
 			# fill histograms
-			for c in j.constituents():
-				for i in range(n_pt_bins):
-					if jet_pt_lo[i] < jet_pt and jet_pt < jet_pt_hi[i]:
+			for i in range(n_pt_bins):
+				if jet_pt_lo[i] < jet_pt and jet_pt < jet_pt_hi[i]:
+					for c in j.constituents():
 						h_jetshape_pt[i].Fill(j.delta_R(c))
-                        
         #################################################################################
 
 	pythia_hard.stat()
@@ -136,6 +136,7 @@ def main():
 		if intg > 0:
 			h.Scale(1/intg)
 		h.Write()
+	h_jetpt.Write()
 
 	# output file you want to write to
 	fout.Write()
