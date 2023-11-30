@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# python3 pythia8_rho.py --nev 100000 --no_smear --output "R0p4.root"
+# python3 pythia8_rho.py --nev 100000 --no_smear --R0 0.4 --py-pthatmin 100 --jet_ptmin 100 --jet_ptmax 120 --output "pt100_R0p4_temptemp2.root"
 
-from pyjetty.mputils.mputils import logbins
+from pyjetty.mputils.mputils import logbins, linbins
 import operator as op
 import itertools as it
 import sys
@@ -60,6 +60,9 @@ def get_args_from_settings(ssettings):
 	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
 	parser.add_argument('--tr_eff_off', action='store_true', default=False)
 	parser.add_argument('--no_smear', action='store_false', default=True)
+	parser.add_argument('--R0', default=0.4, type=float)
+	parser.add_argument('--jet_ptmin', default=100, type=float)
+	parser.add_argument('--jet_ptmax', default=120, type=float)
 	args = parser.parse_args()
 	return args
 
@@ -67,17 +70,18 @@ def get_args_from_settings(ssettings):
 def main():
 	mycfg = []
 	mycfg.append("StringPT:sigma=0.335") # for producing slightly different data sets, default is 0.335 GeV
-	ssettings = "--py-ecm 14000 --py-pthatmin 100"
+	ssettings = "--py-ecm 14000"
 	args = get_args_from_settings(ssettings)
 	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
 	
 	max_eta_hadron = 0.9  # ALICE
-	jet_R0 = 0.4   # R=0.4 standard
+	jet_R0 = args.R0   # R=0.4 standard
 	max_eta_jet = max_eta_hadron - jet_R0
 	parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
-	jet_selector = fj.SelectorAbsEtaMax(max_eta_jet) & fj.SelectorPtMin(20) # & fj.SelectorPtMax(120)
-	pfc_selector0 = fj.SelectorPtMin(0.)
-	pfc_selector1 = fj.SelectorPtMin(1.)
+	
+	jet_ptmin = args.jet_ptmin
+	jet_ptmax = args.jet_ptmax
+	jet_selector = fj.SelectorAbsEtaMax(max_eta_jet) & fj.SelectorPtMin(jet_ptmin) & fj.SelectorPtMax(jet_ptmax)
 
 	# print the banner first
 	fj.ClusterSequence.print_banner()
@@ -88,18 +92,20 @@ def main():
 
 	fout = ROOT.TFile(args.output, 'recreate')
 	fout.cd()
+	
+	nbins = int(50.)
+	lbins = logbins(1.e-3, 1., nbins)
+	n_rlbins = 25
+	rlbins = linbins(0,jet_R0,25)
 
-	# output histogram defintions
-	n_pt_bins = 4
-	jet_pt_lo = np.array([20, 100, 500, 1000])
-	jet_pt_hi = np.array([30, 120, 550, 1100])
-    
 	h_jetpt = ROOT.TH1D('h_jetpt', 'h_jetpt', 232, 20, 1200)
-	h_jetshape_pt = []
-	for i in range(len(jet_pt_lo)):
-		h_jetshape = ROOT.TH1D('h_jetshape_pt_{}'.format(i), 'h_jetshape_pt_{}'.format(i), 25, 0, jet_R0)
-		h_jetshape.Sumw2()
-		h_jetshape_pt.append(h_jetshape)
+	h_trkpt = ROOT.TH1D('h_trkpt', 'h_trkpt', 200, 0, 20)
+	h_jetshape = ROOT.TH3D('h_jetshape', 'h_jetshape_rl_pTtrk_z', n_rlbins, rlbins, 80, linbins(0,20,80), nbins, lbins)
+	h_ptprofile = ROOT.TH1D('h_ptprofile', 'h_ptprofile', nbins, lbins)
+	h_ptshape = ROOT.TH3D('h_ptshape', 'h_ptshape_rl_pTtrk_z', n_rlbins, rlbins, 80, linbins(0,20,80), nbins, lbins)
+	
+	h_jetshape.Sumw2()
+	h_ptshape.Sumw2()
 
     # PYTHIA EVENT-BY-EVENT GENERATION
 	for n in tqdm(range(args.nev)):
@@ -121,22 +127,25 @@ def main():
 			
 			h_jetpt.Fill(jet_pt)
 			
-			# fill histograms
-			for i in range(n_pt_bins):
-				if jet_pt_lo[i] < jet_pt and jet_pt < jet_pt_hi[i]:
-					for c in j.constituents():
-						h_jetshape_pt[i].Fill(j.delta_R(c))
+			# fill histogram
+			pt_sum = np.zeros(n_rlbins)
+			for c in j.constituents():
+				rl = j.delta_R(c)
+				h_jetshape.Fill(rl, c.perp(), c.perp()/j.perp())
+				h_trkpt.Fill(c.perp())
+				h_ptprofile.Fill(c.perp()/j.perp())
+				
+				h_ptshape.Fill(rl, c.perp(), c.perp()/j.perp(), c.perp())
         #################################################################################
 
 	pythia_hard.stat()
 
 	# write histograms to output file
-	for h in h_jetshape_pt:
-		intg = h.GetEntries()
-		if intg > 0:
-			h.Scale(1/intg)
-		h.Write()
+	h_jetshape.Write()
 	h_jetpt.Write()
+	h_trkpt.Write()
+	h_ptprofile.Write()
+	h_ptshape.Write()
 
 	# output file you want to write to
 	fout.Write()

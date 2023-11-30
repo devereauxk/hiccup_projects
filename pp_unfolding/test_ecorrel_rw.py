@@ -32,16 +32,33 @@ import numpy as np
 import uproot as ur
 import yaml
 
+dummyval = -9999
+
 with open("./scaleFactors.yaml", 'r') as stream:
 	pt_hat_yaml = yaml.safe_load(stream)
 pt_hat_lo = pt_hat_yaml["bin_lo"]
 pt_hat_hi = pt_hat_yaml["bin_hi"]
 
+
 # load track efficiency tree
 tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
 
-dummyval = -9999
+def smear_track(part, sigma=0.01):
+	pt = part.perp() * (1 + np.random.normal(0, sigma))
+	px = pt * np.cos(part.phi())
+	py = pt * np.sin(part.phi())
+	pz = part.pz() * (1 + np.random.normal(0, sigma))
+	E = np.sqrt(part.m2() + pt**2 + pz**2)
+	smeared_part = fj.PseudoJet(px, py, pz, E)
+	smeared_part.set_user_index(part.user_index())
+	return smeared_part
+
+def do_keep_track(part):
+    bin_index = np.digitize(part.perp(), tr_eff[1]) - 1
+    keep_prob = tr_eff[0][bin_index]
+    return np.random.choice([0, 1], p=[1 - keep_prob, keep_prob])
+
 
 class EEC_pair:
 	def __init__(self, _index1, _index2, _weight, _r, _pt):
@@ -59,22 +76,6 @@ class EEC_pair:
 		return "EEC pair with (index1, index2, weight, RL, pt) = (" + \
 			str(self.index1) + ", " + str(self.index2) + ", " + str(self.weight) + \
 			", " + str(self.r) + ", " + str(self.pt) + ")"
-
-
-def smear_track(part, sigma=0.01):
-	pt = part.perp() * (1 + np.random.normal(0, sigma))
-	px = pt * np.cos(part.phi())
-	py = pt * np.sin(part.phi())
-	pz = part.pz() * (1 + np.random.normal(0, sigma))
-	E = np.sqrt(part.m2() + pt**2 + pz**2)
-	smeared_part = fj.PseudoJet(px, py, pz, E)
-	smeared_part.set_user_index(part.user_index())
-	return smeared_part
-
-def do_keep_track(part):
-    bin_index = np.digitize(part.perp(), tr_eff[1]) - 1
-    keep_prob = tr_eff[0][bin_index]
-    return np.random.choice([0, 1], p=[1 - keep_prob, keep_prob])
 
 
 def get_args_from_settings(ssettings):

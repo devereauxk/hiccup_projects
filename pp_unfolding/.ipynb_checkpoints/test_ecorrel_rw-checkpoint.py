@@ -30,12 +30,35 @@ import os
 from array import array
 import numpy as np
 import uproot as ur
+import yaml
+
+dummyval = -9999
+
+with open("./scaleFactors.yaml", 'r') as stream:
+	pt_hat_yaml = yaml.safe_load(stream)
+pt_hat_lo = pt_hat_yaml["bin_lo"]
+pt_hat_hi = pt_hat_yaml["bin_hi"]
+
 
 # load track efficiency tree
 tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
 
-dummyval = -9999
+def smear_track(part, sigma=0.01):
+	pt = part.perp() * (1 + np.random.normal(0, sigma))
+	px = pt * np.cos(part.phi())
+	py = pt * np.sin(part.phi())
+	pz = part.pz() * (1 + np.random.normal(0, sigma))
+	E = np.sqrt(part.m2() + pt**2 + pz**2)
+	smeared_part = fj.PseudoJet(px, py, pz, E)
+	smeared_part.set_user_index(part.user_index())
+	return smeared_part
+
+def do_keep_track(part):
+    bin_index = np.digitize(part.perp(), tr_eff[1]) - 1
+    keep_prob = tr_eff[0][bin_index]
+    return np.random.choice([0, 1], p=[1 - keep_prob, keep_prob])
+
 
 class EEC_pair:
 	def __init__(self, _index1, _index2, _weight, _r, _pt):
@@ -55,35 +78,20 @@ class EEC_pair:
 			", " + str(self.r) + ", " + str(self.pt) + ")"
 
 
-def smear_track(part, sigma=0.01):
-	pt = part.perp() * (1 + np.random.normal(0, sigma))
-	px = pt * np.cos(part.phi())
-	py = pt * np.sin(part.phi())
-	pz = part.pz() * (1 + np.random.normal(0, sigma))
-	E = np.sqrt(part.m2() + pt**2 + pz**2)
-	smeared_part = fj.PseudoJet(px, py, pz, E)
-	smeared_part.set_user_index(part.user_index())
-	return smeared_part
-
-def do_keep_track(part):
-    bin_index = np.digitize(part.perp(), tr_eff[1]) - 1
-    keep_prob = tr_eff[0][bin_index]
-    return np.random.choice([0, 1], p=[1 - keep_prob, keep_prob])
-
-
 def get_args_from_settings(ssettings):
 	sys.argv = sys.argv + ssettings.split()
 	parser = argparse.ArgumentParser(description='pythia8 fastjet on the fly')
 	pyconf.add_standard_pythia_args(parser)
 	parser.add_argument('--output', default="test_ecorrel_rw.root", type=str)
 	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
+	parser.add_argument('--tr_eff_off', action='store_true', default=False)
 	args = parser.parse_args()
 	return args
 
 
 def main():
 	mycfg = []
-    mycfg.append("StringPT:sigma=0.2") # for producing slightly different data sets, default is 0.335 GeV
+	mycfg.append("StringPT:sigma=0.2") # for producing slightly different data sets, default is 0.335 GeV
 	ssettings = "--py-ecm 5020 --py-pthatmin 20"
 	args = get_args_from_settings(ssettings)
 	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
@@ -110,7 +118,7 @@ def main():
 	preprocessed = ROOT.TTree("preprocessed", "true and smeared obs")
 	[gen_energy_weight, gen_R_L, gen_jet_pt] = [array('d', [0]) for i in range(3)]
 	[obs_energy_weight, obs_R_L, obs_jet_pt] = [array('d', [0]) for i in range(3)]
-	obs_thrown = array('d', [0])
+	[pt_hat_weight, event_n] = [array('d', [0]) for i in range(2)]
 
 	preprocessed.Branch("gen_energy_weight", gen_energy_weight, "gen_energy_weight/D")
 	preprocessed.Branch("gen_R_L", gen_R_L, "gen_R_L/D")
@@ -118,7 +126,8 @@ def main():
 	preprocessed.Branch("obs_energy_weight", obs_energy_weight, "obs_energy_weight/D")
 	preprocessed.Branch("obs_R_L", obs_R_L, "obs_R_L/D")
 	preprocessed.Branch("obs_jet_pt", obs_jet_pt, "obs_jet_pt/D")
-	preprocessed.Branch("obs_thrown", obs_thrown, "obs_thrown/D")
+	preprocessed.Branch("pt_hat_weight", pt_hat_weight, "pt_hat_weight/D")
+	preprocessed.Branch("event_n", event_n, "event_n/D")
     
 	# debug tree definitions
 	particle_pt_tree = ROOT.TTree("particle_pt", "true and smeared particle-level")
@@ -131,10 +140,22 @@ def main():
 	jet_pt_tree.Branch("gen_pt", gen_jet_pt_debug, "gen_pt/D")
 	jet_pt_tree.Branch("obs_pt", obs_jet_pt_debug, "obs_pt/D")
 
- 
+	event_n[0] = 0
 	for n in tqdm(range(args.nev)):
 		if not pythia_hard.next():
 				continue
+		
+		# count events
+		event_n[0] += 1
+		
+		# find weight from yaml file for this pthat
+		pthat = pythia_hard.info.pTHat()
+		pt_hat_bin = len(pt_hat_lo) # 1-indexed
+		for i in range(1,len(pt_hat_lo)):
+			if pthat >= pt_hat_yaml[i] and pthat < pt_hat_yaml[i+1]:
+				pt_hat_bin = i
+				break
+		pt_hat_weight[0] = pt_hat_yaml[pt_hat_bin]
 		
 		#======================================
 		#            Particle level
@@ -152,7 +173,7 @@ def main():
             
 			# smearing + track efficiency
 			obs_pt[0] = -9999
-			if do_keep_track(part):
+			if args.tr_eff_off or do_keep_track(part):
 				smeared_part = smear_track(part, 0.01)
 				parts_pythia_p_smeared.push_back(smeared_part)
 				obs_pt[0] = smeared_part.perp()
@@ -189,8 +210,8 @@ def main():
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
 			for i in range(len(EEC_rs)):
-				event_index1 = _v[EEC_indicies1[i]].user_index()
-				event_index2 = _v[EEC_indicies2[i]].user_index()
+				event_index1 = _v[int(EEC_indicies1[i])].user_index()
+				event_index2 = _v[int(EEC_indicies2[i])].user_index()
 				truth_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
 
 		############################# SMEARED PAIRS ################################
@@ -222,8 +243,8 @@ def main():
 			EEC_indicies2 = EEC_cb.indices2() # contains list of 2nd track in the pair
 
 			for i in range(len(EEC_rs)):
-				event_index1 = _v[EEC_indicies1[i]].user_index()
-				event_index2 = _v[EEC_indicies2[i]].user_index()
+				event_index1 = _v[int(EEC_indicies1[i])].user_index()
+				event_index2 = _v[int(EEC_indicies2[i])].user_index()
 				smeared_pairs.append(EEC_pair(event_index1, event_index2, EEC_weights[i], EEC_rs[i], jet_pt))
 				
 		########################## TTree output generation #########################
@@ -233,7 +254,6 @@ def main():
 			gen_energy_weight[0] = t_pair.weight
 			gen_R_L[0] = t_pair.r
 			gen_jet_pt[0] = t_pair.pt
-			obs_thrown[0] = 0
 
 			match_found = False
 			for s_pair in smeared_pairs:
@@ -248,7 +268,6 @@ def main():
 				obs_energy_weight[0] = dummyval
 				obs_R_L[0] = dummyval
 				obs_jet_pt[0] = dummyval
-				obs_thrown[0] = 1
 				preprocessed.Fill()
 
 		# fill jet resolution debug ttree
