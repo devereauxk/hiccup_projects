@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-# python3 pythia8_rho.py --nev 100000 --no_smear --R0 0.4 --py-pthatmin 100 --jet_ptmin 100 --jet_ptmax 120 --output "pt100_R0p4_temptemp2.root"
+# python3 pythia8_rho.py --nev 1000000 --no_smear --jetR 0.4 --py-ecm 5020 --py-pthatmin 5 --jet_ptmin 5 --jet_ptmax 120 --output "pt5_R0p4_s5p02.root"
 
-from pyjetty.mputils.mputils import logbins, linbins
 import operator as op
 import itertools as it
 import sys
@@ -32,10 +31,23 @@ from array import array
 import numpy as np
 import uproot as ur
 import yaml
+import array
 
 # load track efficiency tree
+"""
 tr_eff_file = ur.open("tr_eff.root")
 tr_eff = tr_eff_file["tr_eff"].to_numpy()
+"""
+
+def linbins(xmin, xmax, nbins):
+  lspace = np.linspace(xmin, xmax, nbins+1)
+  arr = array.array('f', lspace)
+  return arr
+
+def logbins(xmin, xmax, nbins):
+  lspace = np.logspace(np.log10(xmin), np.log10(xmax), nbins+1)
+  arr = array.array('f', lspace)
+  return arr
 
 def smear_track(part, sigma=0.01):
 	pt = part.perp() * (1 + np.random.normal(0, sigma))
@@ -52,106 +64,168 @@ def do_keep_track(part):
     keep_prob = tr_eff[0][bin_index]
     return np.random.choice([0, 1], p=[1 - keep_prob, keep_prob])
 
-def get_args_from_settings(ssettings):
-	sys.argv = sys.argv + ssettings.split()
+def get_args_from_settings():
 	parser = argparse.ArgumentParser(description='pythia8 fastjet on the fly')
 	pyconf.add_standard_pythia_args(parser)
+	#parser.add_argument('--py-ecm', default=14000, type=float)
 	parser.add_argument('--output', default="test_ecorrel_rw.root", type=str)
 	parser.add_argument('--user-seed', help='pythia seed', default=1111, type=int)
 	parser.add_argument('--tr_eff_off', action='store_true', default=False)
 	parser.add_argument('--no_smear', action='store_false', default=True)
-	parser.add_argument('--R0', default=0.4, type=float)
+	parser.add_argument('--jetR', default=0.4, type=float)
 	parser.add_argument('--jet_ptmin', default=100, type=float)
 	parser.add_argument('--jet_ptmax', default=120, type=float)
 	args = parser.parse_args()
 	return args
 
 
-def main():
-	mycfg = []
-	mycfg.append("StringPT:sigma=0.335") # for producing slightly different data sets, default is 0.335 GeV
-	ssettings = "--py-ecm 14000"
-	args = get_args_from_settings(ssettings)
-	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
-	
-	max_eta_hadron = 0.9  # ALICE
-	jet_R0 = args.R0   # R=0.4 standard
-	max_eta_jet = max_eta_hadron - jet_R0
-	parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
-	
-	jet_ptmin = args.jet_ptmin
-	jet_ptmax = args.jet_ptmax
-	jet_selector = fj.SelectorAbsEtaMax(max_eta_jet) & fj.SelectorPtMin(jet_ptmin) & fj.SelectorPtMax(jet_ptmax)
+class Process_Pythia_JetTrk:
 
-	# print the banner first
-	fj.ClusterSequence.print_banner()
-	print()
-	# set up our jet definition and a jet selector
-	jet_def = fj.JetDefinition(fj.antikt_algorithm, jet_R0)
-	print(jet_def)
-
-	fout = ROOT.TFile(args.output, 'recreate')
-	fout.cd()
-	
-	nbins = int(50.)
-	lbins = logbins(1.e-3, 1., nbins)
-	n_rlbins = 25
-	rlbins = linbins(0,jet_R0,25)
-
-	h_jetpt = ROOT.TH1D('h_jetpt', 'h_jetpt', 232, 20, 1200)
-	h_trkpt = ROOT.TH1D('h_trkpt', 'h_trkpt', 200, 0, 20)
-	h_jetshape = ROOT.TH3D('h_jetshape', 'h_jetshape_rl_pTtrk_z', n_rlbins, rlbins, 80, linbins(0,20,80), nbins, lbins)
-	h_ptprofile = ROOT.TH1D('h_ptprofile', 'h_ptprofile', nbins, lbins)
-	h_ptshape = ROOT.TH3D('h_ptshape', 'h_ptshape_rl_pTtrk_z', n_rlbins, rlbins, 80, linbins(0,20,80), nbins, lbins)
-	
-	h_jetshape.Sumw2()
-	h_ptshape.Sumw2()
-
-    # PYTHIA EVENT-BY-EVENT GENERATION
-	for n in tqdm(range(args.nev)):
-		if not pythia_hard.next():
-				continue
+	def __init__(self):
+		self.observable_list = ['jet_pt_JetPt', 'trk_pt_TrkPt', 'jet-trk_shape_RL_TrkPt_JetPt', 'jet-trk_shape_RL_z_JetPt', 
+    'jet-trk_ptprofile_RL_TrkPt_JetPt', 'jet-trk_ptprofile_RL_z_JetPt']
 		
-		#======================================
-		#            Particle level
-		#======================================
-		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal, pythiafjext.kCharged], 0, True)
-		parts_pythia_p_selected = parts_selector(parts_pythia_p)
-            
-		############################# PAIR CONSTITUENTS AND JET AXIS ################################
-		# jet reconstruction
-		jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_selected)))
+		self.args = get_args_from_settings()
+		self.jetR = self.args.jetR
+		self.max_eta_hadron = 0.9 # ALICE
 
-		for j in jets_p:
-			jet_pt = j.perp() # jet pt
+		self.initialize_user_output_objects()
+
+	def initialize_user_output_objects(self):
+		# histogram definitions
+		jetR = self.jetR
+		obs_label = "0.15"
+
+		for observable in self.observable_list:
+			if observable == 'jet_pt_JetPt':
+				name = 'h_{}_R{}_{}'.format(observable, jetR, obs_label)
+				jetpt_bins = linbins(0,200,200)
+				h = ROOT.TH1D(name, name, 200, jetpt_bins)
+				h.GetXaxis().SetTitle('p_{T jet}')
+				h.GetYaxis().SetTitle('Counts')
+				setattr(self, name, h)
+
+			if observable == "trk_pt_TrkPt":
+				name = 'h_{}_R{}_{}'.format(observable, jetR, obs_label)
+				trkpt_bins = linbins(0,20,200)
+				h = ROOT.TH1D(name, name, 200, trkpt_bins)
+				h.GetXaxis().SetTitle('p_{T,ch trk}')
+				h.GetYaxis().SetTitle('Counts')
+				setattr(self, name, h)
+
+			if "_RL_TrkPt_JetPt" in observable:
+				name = 'h_{}_R{}_{}'.format(observable, jetR, obs_label)
+				RL_bins = linbins(0,jetR,50)
+				trkpt_bins = linbins(0,20,200)
+				jetpt_bins = linbins(0,200,200)
+				h = ROOT.TH3D(name, name, 50, RL_bins, 200, trkpt_bins, 200, jetpt_bins)
+				h.GetXaxis().SetTitle('#Delta R')
+				h.GetYaxis().SetTitle('p_{T,ch trk}')
+				h.GetZaxis().SetTitle('p_{T jet}')
+				setattr(self, name, h)
+
+			if "_RL_z_JetPt" in observable:
+				name = 'h_{}_R{}_{}'.format(observable, jetR, obs_label)
+				RL_bins = linbins(0,jetR,50)
+				z_bins = logbins(1.e-5, 1., 200)
+				jetpt_bins = linbins(0,200,200)
+				h = ROOT.TH3D(name, name, 50, RL_bins, 200, z_bins, 200, jetpt_bins)
+				h.GetXaxis().SetTitle('#Delta R')
+				h.GetYaxis().SetTitle('z')
+				h.GetZaxis().SetTitle('p_{T jet}')
+				setattr(self, name, h)
+
+	def process(self):
+		mycfg = []
+		mycfg.append("StringPT:sigma=0.335") # for producing slightly different data sets, default is 0.335 GeV
+		pythia_hard = pyconf.create_and_init_pythia_from_args(self.args, mycfg)
+		
+		jetR = self.jetR
+		obs_label = "0.15"
+
+		max_eta_jet = self.max_eta_hadron - jetR
+		parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(self.max_eta_hadron)
+		
+		jet_ptmin = self.args.jet_ptmin
+		jet_ptmax = self.args.jet_ptmax
+		jet_selector = fj.SelectorAbsEtaMax(max_eta_jet) & fj.SelectorPtMin(jet_ptmin) & fj.SelectorPtMax(jet_ptmax)
+
+		# print the banner first
+		fj.ClusterSequence.print_banner()
+		print()
+		# set up our jet definition and a jet selector
+		jet_def = fj.JetDefinition(fj.antikt_algorithm, self.jetR)
+		print(jet_def)
+
+		fout = ROOT.TFile(self.args.output, 'recreate')
+		fout.cd()
+
+		# PYTHIA EVENT-BY-EVENT GENERATION
+		for n in tqdm(range(self.args.nev)):
+			if not pythia_hard.next():
+					continue
 			
-			h_jetpt.Fill(jet_pt)
-			
-			# fill histogram
-			pt_sum = np.zeros(n_rlbins)
-			for c in j.constituents():
-				rl = j.delta_R(c)
-				h_jetshape.Fill(rl, c.perp(), c.perp()/j.perp())
-				h_trkpt.Fill(c.perp())
-				h_ptprofile.Fill(c.perp()/j.perp())
+			#======================================
+			#            Particle level
+			#======================================
+			parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal, pythiafjext.kCharged], 0, True)
+			parts_pythia_p_selected = parts_selector(parts_pythia_p)
+
+			############################# PAIR CONSTITUENTS AND JET AXIS ################################
+			# jet reconstruction
+			jets_p = fj.sorted_by_pt(jet_selector(jet_def(parts_pythia_p_selected)))
+
+			for jet in jets_p:
+
+				c_select = fj.sorted_by_pt(jet.constituents())
 				
-				h_ptshape.Fill(rl, c.perp(), c.perp()/j.perp(), c.perp())
-        #################################################################################
+				# fill histograms
+				hname = 'h_{}_R{}_{}'
+				for observable in self.observable_list:
+					
+					if observable == 'jet_pt_JetPt':
+						print(hname.format(observable, jetR, obs_label))
+						getattr(self, hname.format(observable, jetR, obs_label)).Fill(jet.perp())
 
-	pythia_hard.stat()
+					if observable == "trk_pt_TrkPt":
+						for c in c_select:
+							getattr(self, hname.format(observable, jetR, obs_label)).Fill(c.perp())
+							
+					if 'jet-trk' in observable:
+						h = getattr(self, hname.format(observable, jetR, obs_label))
+						
+						for c in c_select:
+							rl = jet.delta_R(c)
 
-	# write histograms to output file
-	h_jetshape.Write()
-	h_jetpt.Write()
-	h_trkpt.Write()
-	h_ptprofile.Write()
-	h_ptshape.Write()
+							if observable == "jet-trk_shape_RL_TrkPt_JetPt":
+								h.Fill(rl, c.perp(), jet.perp())
+							elif observable == "jet-trk_ptprofile_RL_TrkPt_JetPt":
+								h.Fill(rl, c.perp(), jet.perp(), c.perp())
+							elif observable == "jet-trk_shape_RL_z_JetPt":
+								h.Fill(rl, c.perp()/jet.perp(), jet.perp())
+							elif observable == "jet-trk_ptprofile_RL_z_JetPt":
+								h.Fill(rl, c.perp()/jet.perp(), jet.perp(), c.perp())
 
-	# output file you want to write to
-	fout.Write()
-	fout.Close()
-	print('[i] written ', fout.GetName())
+			#################################################################################
+
+		pythia_hard.stat()
+
+		for attr in dir(self):
+			obj = getattr(self, attr)
+        
+			#print(str(attr) + " " + str(type(obj)))
+
+			# Write all ROOT histograms and trees to file
+			types = (ROOT.TH1, ROOT.THnBase, ROOT.TTree, ROOT.TH2, ROOT.TH3)
+			if isinstance(obj, types):
+				obj.Write()
+
+		# output file you want to write to
+		fout.Write()
+		fout.Close()
+		print('[i] written ', fout.GetName())
 
 
 if __name__ == '__main__':
-	main()
+	process_obj = Process_Pythia_JetTrk()
+	process_obj.process()

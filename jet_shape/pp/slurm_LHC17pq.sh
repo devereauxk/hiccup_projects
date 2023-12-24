@@ -6,14 +6,15 @@
 #SBATCH --job-name=kyle17pq
 #SBATCH --nodes=1 --ntasks=1 --cpus-per-task=1
 #SBATCH --time=01:00:00
-#SBATCH --array=1-500
+#SBATCH --array=1-50
 #SBATCH --output=/global/cfs/projectdirs/alice/kdevero/jobout/slurm-%A/%a.out
 
 FILE_PATHS='/global/cfs/projectdirs/alice/alicepro/hiccup/rstorage/alice/data/LHC17pq/448/files.txt'
 NFILES=$(wc -l < $FILE_PATHS)
+NFILES=150
 echo "N files to process: ${NFILES}"
 
-FILES_PER_JOB=$(( $NFILES / 500 + 1 ))
+FILES_PER_JOB=$(( $NFILES / 50 + 1 ))
 echo "Files per job: $FILES_PER_JOB"
 
 STOP=$(( SLURM_ARRAY_TASK_ID*FILES_PER_JOB ))

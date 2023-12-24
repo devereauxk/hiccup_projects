@@ -4,4 +4,4 @@
 INFILE="/global/cfs/projectdirs/alice/alicepro/hiccup/rstorage/alice/data/LHC18qr/147-148/148/child_1/0830/AnalysisResults.root"
 OUTPUT_DIR="./output_data"
 
-python $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_data_jet-trk.py -c $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_PbPb_R02.yaml -f $INFILE -o $OUTPUT_DIR
+python $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_data_jet-trk.py -c $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_PbPb.yaml -f $INFILE -o $OUTPUT_DIR

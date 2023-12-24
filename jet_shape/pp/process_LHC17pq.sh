@@ -49,7 +49,7 @@ echo $PYJETTY_DIR
 
 # Run python script
 #python process/user/wenqing/process_data_ENC.py -c config/ENC/pp/process_pp.yaml -f $INPUT_FILE -o $OUTPUT_DIR
-python $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_data_ENC.py -c $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_pp_data.yaml -f $INPUT_FILE -o $OUTPUT_DIR
+python $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_data_jet-trk.py -c $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_pp_data.yaml -f $INPUT_FILE -o $OUTPUT_DIR
 
 
 # Move stdout to appropriate folder
