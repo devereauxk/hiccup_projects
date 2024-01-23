@@ -34,3 +34,10 @@ def projectionY(h):
 
 def projectionZ(h):
     return np.sum(np.sum(h, axis=0), axis=0)
+
+def rebin(h, bin_edges, factor):
+    assert len(h) % factor == 0
+    bin_width = bin_edges[1] - bin_edges[0]
+    h_combined = np.array([np.sum(h[i*factor:(i+1)*factor]) for i in range(int(len(h) / factor))]) / factor
+    bin_edges = bin_edges[::factor]
+    return h_combined, bin_edges
