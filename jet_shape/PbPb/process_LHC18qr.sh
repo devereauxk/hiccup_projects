@@ -34,6 +34,3 @@ echo $PYJETTY_DIR
 # Run python script
 #python process/user/wenqing/process_data_ENC.py -c config/ENC/pp/process_pp.yaml -f $INPUT_FILE -o $OUTPUT_DIR
 python $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_data_jet-trk.py -c $PYJETTY_DIR/pyjetty/alice_analysis/process/user/kyle/process_PbPb.yaml -f $INPUT_FILE -o $OUTPUT_DIR
-
-# Move stdout to appropriate folder
-#mv /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/slurm-${JOB_ID}_${TASK_ID}.out /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/${JOB_ID}/

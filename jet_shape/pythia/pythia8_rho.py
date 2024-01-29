@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# python3 pythia8_rho.py --nev 1000000 --no_smear --jetR 0.4 --py-ecm 5020 --py-pthatmin 5 --jet_ptmin 5 --jet_ptmax 120 --output "pt5_R0p4_s5p02.root"
+# python3 pythia8_rho.py --nev 1000000 --no_smear --jetR 0.4 --py-ecm 5020 --py-pthatmin 10 --jet_ptmin 10 --jet_ptmax 120 --output "pt10_R0p4_s5p02.root"
 
 import operator as op
 import itertools as it

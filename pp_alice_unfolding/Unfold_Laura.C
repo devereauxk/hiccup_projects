@@ -4,36 +4,47 @@
 #include "sstream"
 #endif
 
-void readin_data(TString preprocessed_file="preprocessed_mc.root")
-{
-  
-}
-
 void Unfold(std::string file_mc, std::string file_data, std::string date)
 {
   RooUnfold::ErrorTreatment errorTreatment = RooUnfold::kCovariance;
 
-  TFile* f_mc = new TFile(file_mc.c_str());  
-  RooUnfoldResponse* response = (RooUnfoldResponse*)f_mc->Get("smeared_true");
-  RooUnfoldResponse* response1D = (RooUnfoldResponse*)f_mc->Get("h1_smeared_h1_true");
-
+  
+  TFile* f_mc = new TFile(file_mc.c_str());
   TFile* f_data = new TFile(file_data.c_str());
   TH3D* h3_raw = (TH3D*)f_data->Get("raw");
+  TH3D* h3_smeared = (TH3D*)f_mc->Get("smeared");
+  TH3D* h3_true_match = (TH3D*)f_mc->Get("true_match");
+  TH3D* h3_true = (TH3D*)f_mc->Get("truef");
+  TH3D* h3_reco_match = (TH3D*)f_mc->Get("reco");
+  TH3D* h3_reco = (TH3D*)f_mc->Get("recof");
+
+  RooUnfoldResponse* response = (RooUnfoldResponse*)f_mc->Get("smeared_true");
+  RooUnfoldResponse* response1D = (RooUnfoldResponse*)f_mc->Get("h1_smeared_h1_true");
   
+  TH1D* h1_true_match = (TH1D*)f_mc->Get("h1_true");
+  TH1D* h1_true = (TH1D*)f_mc->Get("h1_fulleff");
+  TH1D* h1_raw = (TH1D*)f_data->Get("h1_raw");
+  TH1D* h1_reco = (TH1D*)f_data->Get("h1_reco");
   std::stringstream ss;
   ss << "Unfold_nom_" << date << ".root";
   TFile* fout = new TFile(ss.str().c_str(), "recreate");
   ss.str("");
-
   h3_raw->Write();
+  h3_smeared->Write();
+  h3_true_match->Write();
+  h3_true->Write();
+  h3_reco_match->Write();
+  h3_reco->Write();
+  h1_true_match->Write();
+  h1_true->Write();
+  h1_raw->Write();
+  h1_reco->Write();
   
-  /* TODO 
   TH3D* h3_purity = (TH3D*)h3_reco_match->Clone("h3_purity");
   h3_purity->Divide(h3_reco);
   h3_purity->Write();
-  */
   TH3D* h3_raw_corr = (TH3D*)h3_raw->Clone("h3_raw_corr");
-  // h3_raw_corr->Multiply(h3_purity);
+  h3_raw_corr->Multiply(h3_purity);
   h3_raw_corr->Write();
 
   for(int jar=1;jar<10;jar++){
