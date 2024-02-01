@@ -24,6 +24,8 @@ void unfold(const TString& infile="preunfold.root", const TString& outfile="unfo
     TH3D* h3_raw = (TH3D*) f->Get("raw");
     TH1D* h1_raw = (TH1D*) f->Get("raw1D");
 
+    // TODO add in h1 unfolding
+
     // Create output file
     TFile* fout = new TFile(outfile, "RECREATE");
 
