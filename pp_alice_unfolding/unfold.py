@@ -1,8 +1,12 @@
 # WANT TO BE ABLE TO WRITE SMTH GENERALIZABLE TO OTHER THINGS
 # DO THIS BY GENERALIZING THE UNFOLD FILE, THIS ONE HAS TO BE EEC-SPECIFIC
 
-# usage
+
+# DOES NOT WORK ON PERLY !!!!!!!!!!!!!! weird roounfold dependencies ... no 3D support
+# usage - run with the "roounfold_load" environment
+# CLOSURE
 # python3 unfold.py --input_file preunfold.root --output_file unfolded.root --iter 3
+
 
 # imports
 import numpy as np

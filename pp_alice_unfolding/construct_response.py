@@ -1,12 +1,17 @@
 # WANT TO BE ABLE TO WRITE SMTH GENERALIZABLE TO OTHER THINGS
 # DO THIS BY GENERALIZING THE UNFOLD FILE, THIS ONE HAS TO BE EEC-SPECIFIC
 
-# usage
-# python3 construct_response.py --mc_file ../pp_unfolding/preprocess_sigma335_400k.root --data_file ../pp_unfolding/preprocess_sigma2_400k.root --closure True
+# WARNING METHODS APPEND TO OUTPUT FILE, WHEN RUNNING CONFIRM THIS IS INTENDED BEHAVIOR
+
+# usage - run with the "pyjetty_load" environment
+# CLOSURE
+# python3 construct_response.py --mc_file ../pp_unfolding/preprocess_sigma335_400k.root --data_file ../pp_unfolding/preprocess_sigma2_400k.root --output_file ./preunfold_closure_new.root --closure True
+# FULL SIM / DATA
+# python3 construct_response.py --mc_file /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/mc-13794540/merged_small.root --data_file /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/data-13796056/merged_medium.root --output_file ./preunfold_fr.root
+
 
 # imports
 import numpy as np
-import pandas as pd
 import uproot as ur
 import ROOT
 import argparse
@@ -48,22 +53,33 @@ def construct_response(n_mc_file="preprocessed_mc.root", n_out="preunfold.root")
     all_features = gen_features + obs_features
     theta0 = synth_df[all_features].to_numpy()
 
+    n_rows = len(theta0)
+    i = 0
+    last_jetpt_obs = -1
     for row in theta0:
+
+        i += 1
+        if i % int(n_rows / 50) == 0: print("{} / {}".format(i, n_rows))
 
         [weight_gen, rl_gen, jetpt_gen, weight_obs, rl_obs, jetpt_obs] = [i for i in row]
 
-        if weight_obs >= 0: # if sucessful measurement
-            response.Fill(weight_obs, rl_obs, jetpt_obs, weight_gen, rl_gen, jetpt_gen)
-            response1D.Fill(jetpt_obs, jetpt_gen)
+        h3_gen.Fill(weight_gen, rl_gen, jetpt_gen)
 
+        # if sucessful measurement, assumes missed are given some negative valuu for the energy weight
+        if weight_obs >= 0:
+            response.Fill(weight_obs, rl_obs, jetpt_obs, weight_gen, rl_gen, jetpt_gen)
             h3_reco.Fill(weight_obs, rl_obs, jetpt_obs)
-            h1_reco.Fill(jetpt_obs)
         else:
             response.Miss(weight_gen, rl_gen, jetpt_gen)
-            response1D.Miss(jetpt_gen)
-
-            h3_gen.Fill(weight_gen, rl_gen, jetpt_gen)
+        
+        # only fill 1D jetpt unfolding matrix once per jet
+        # assumes perfect jet matching - is that valid ?!
+        if jetpt_obs >= 0 and jetpt_obs != last_jetpt_obs:
+            response1D.Fill(jetpt_obs, jetpt_gen)
+            h1_reco.Fill(jetpt_obs)
             h1_gen.Fill(jetpt_gen)
+            last_jetpt_obs = jetpt_obs
+            
 
     response.Write()
     response1D.Write()
@@ -105,18 +121,30 @@ def constructed_data_hist(n_data_file="preprocessed_data.root", n_out="preunfold
         all_features = obs_features
     theta_unknown = natural_df[all_features].to_numpy()
 
+    n_rows = len(theta_unknown)
+    i = 0
+    last_jetpt_obs = -1
     for row in theta_unknown:
+
+        i += 1
+        if i % int(n_rows / 50) == 0: print("{} / {}".format(i, n_rows))
+
         if closure:
             [weight_gen, rl_gen, jetpt_gen, weight_obs, rl_obs, jetpt_obs] = row
         else:
             [weight_obs, rl_obs, jetpt_obs] = row
 
         h3_raw.Fill(weight_obs, rl_obs, jetpt_obs)
-        h1_raw.Fill(jetpt_obs)
-
         if closure:
             h3_true.Fill(weight_gen, rl_gen, jetpt_gen)
-            h1_true.Fill(jetpt_gen)
+        
+        # only fill 1D jetpt unfolding matrix once per jet
+        if jetpt_obs >= 0 and jetpt_obs != last_jetpt_obs:
+            h1_raw.Fill(jetpt_obs)
+            last_jetpt_obs = jetpt_obs
+
+            if closure:
+                h1_true.Fill(jetpt_gen)
 
     h3_raw.Write()
     h1_raw.Write()
@@ -139,6 +167,8 @@ if __name__ == "__main__":
     parser.add_argument('--closure', type=bool, default=False)
 
     flags = parser.parse_args()
+
+    print("closure ; ", flags.closure)
 
     construct_response(flags.mc_file, flags.output_file)
     constructed_data_hist(flags.data_file, flags.output_file, flags.closure)

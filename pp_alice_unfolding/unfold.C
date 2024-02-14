@@ -8,10 +8,14 @@
 #include </global/cfs/cdirs/alice/kdevero/RooUnfold/RooUnfold/build/RooUnfoldResponse.h>
 
 // usage
-// root -q "unfold.C(\"preunfold.root\", \"unfolded.root\", 3)"
+// CLOSURE
+// root -q "unfold.C(\"preunfold_closure_new.root\", \"unfolded_closure_new.root\", 8)"
+// FULLSIM / DATA
+// root -q "unfold.C(\"preunfold_fr.root\", \"unfolded_fr.root\", 8)"
+
 
 void unfold(const TString& infile="preunfold.root", const TString& outfile="unfolded.root", int iter=9) {
-    // Set ROOT to batch mode
+    // Set ROOT to batch mod
     gROOT->SetBatch(true);
 
     // Error treatment for unfolding
@@ -32,20 +36,23 @@ void unfold(const TString& infile="preunfold.root", const TString& outfile="unfo
     for (int i = 1; i <= iter; ++i) {
         // Unfold the 3D histogram
         RooUnfoldBayes unfold(response, h3_raw, i);
+        RooUnfoldBayes unfold1D(response1D, h1_raw, i);
         TH3* hunf = (TH3*)unfold.Hunfold(errorTreatment);
+        TH1* hunf1D = (TH1*)unfold1D.Hunfold(errorTreatment);
         //TH3* hfold = (TH3*)response->ApplyToTruth(hunf, "");
 
         cout<<"unfolded"<<endl;
 
         // Clone and name histograms
         TH3* htempUnf = (TH3*)hunf->Clone(TString::Format("Baysian_Unfoldediter%d", i));
+        TH1* htempUnf1D = (TH1*)hunf1D->Clone(TString::Format("Baysian_Unfolded1Diter%d", i));
         //TH3* htempFold = (TH3*)hfold->Clone(TString::Format("Baysian_Foldediter%d", i));
-
-        cout<<"written"<<endl;
 
         // Write histograms to output file
         htempUnf->Write();
-        //htempFold->Write();
+        htempUnf1D->Write();
+
+        cout<<"written"<<endl;
     }
 
     // Write output file
