@@ -65,7 +65,7 @@ def construct_response(n_mc_file="preprocessed_mc.root", n_out="preunfold.root")
 
         h3_gen.Fill(weight_gen, rl_gen, jetpt_gen)
 
-        # if sucessful measurement, assumes missed are given some negative valuu for the energy weight
+        # if sucessful measurement, assumes missed are given some negative value for the energy weight
         if weight_obs >= 0:
             response.Fill(weight_obs, rl_obs, jetpt_obs, weight_gen, rl_gen, jetpt_gen)
             h3_reco.Fill(weight_obs, rl_obs, jetpt_obs)

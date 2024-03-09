@@ -9,9 +9,9 @@
 
 // usage
 // CLOSURE
-// root -q "unfold.C(\"preunfold_closure_new.root\", \"unfolded_closure_new.root\", 8)"
+// root -q "unfold.C(\"preunfold_closure.root\", \"unfolded_closure_new.root\", 8)"
 // FULLSIM / DATA
-// root -q "unfold.C(\"preunfold_fr.root\", \"unfolded_fr.root\", 8)"
+// root -q "unfold.C(\"preunfold_fr.root\", \"unfolded_fr_new.root\", 8)"
 
 
 void unfold(const TString& infile="preunfold.root", const TString& outfile="unfolded.root", int iter=9) {
@@ -54,6 +54,15 @@ void unfold(const TString& infile="preunfold.root", const TString& outfile="unfo
 
         cout<<"written"<<endl;
     }
+
+    // Make TH2Ds out of response matricies, add to output file
+    TH2D* matrix = (TH2D*) response->Hresponse();
+    matrix->SetName("matrix");
+    matrix->Write();
+
+    TH2D* matrix1D = (TH2D*) response1D->Hresponse();
+    matrix1D->SetName("matrix1D");
+    matrix1D->Write();
 
     // Write output file
     fout->Write();

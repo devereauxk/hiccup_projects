@@ -5,13 +5,13 @@
 #SBATCH --account=alice
 #SBATCH --job-name=kyle18qr
 #SBATCH --nodes=1 --ntasks=1 --cpus-per-task=1
-#SBATCH --time=01:00:00
+#SBATCH --time=00:30:00
 #SBATCH --array=1-55
 #SBATCH --output=/global/cfs/projectdirs/alice/kdevero/jobout/slurm-%A/%a.out
 
 FILE_PATHS='/global/cfs/cdirs/alice/wenqing/ENC/files_LHC18qr.txt'
 NFILES=$(wc -l < $FILE_PATHS)
-NFILES=1000
+NFILES=700
 echo "N files to process: ${NFILES}"
 
 FILES_PER_JOB=$(( $NFILES / 55 + 1 ))
