@@ -7,7 +7,7 @@ FILE_LIST="/global/cfs/cdirs/alice/wenqing/ENC/files_LHC18qr.txt"
 OUTPUT_DIR="./output_data/temp"
 
 # Number of iterations
-N=3  # Set your desired number of iterations
+N=50  # Set your desired number of iterations
 
 # Create the output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
