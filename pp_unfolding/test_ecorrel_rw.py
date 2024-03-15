@@ -32,6 +32,9 @@ import numpy as np
 import uproot as ur
 import yaml
 
+# usage
+# python test_ecorrel_rw.py --nev 400000 --output "./preprocess_sigma335_400k.root"
+
 dummyval = -9999
 
 with open("./scaleFactors.yaml", 'r') as stream:
@@ -91,18 +94,18 @@ def get_args_from_settings(ssettings):
 
 def main():
 	mycfg = []
-	mycfg.append("StringPT:sigma=0.2") # for producing slightly different data sets, default is 0.335 GeV
-	ssettings = "--py-ecm 5020 --py-pthatmin 20"
+	mycfg.append("StringPT:sigma=0.335") # for producing slightly different data sets, default is 0.335 GeV
+	ssettings = "--py-ecm 5020 --py-pthatmin 5"
 	args = get_args_from_settings(ssettings)
 	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
 	
 	max_eta_hadron = 0.9  # ALICE
 	jet_R0 = 0.4
 	max_eta_jet = max_eta_hadron - jet_R0
-	parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
-	jet_selector = fj.SelectorPtMin(20) & fj.SelectorPtMax(40) & fj.SelectorAbsEtaMax(max_eta_jet) 
-	pfc_selector0 = fj.SelectorPtMin(0.)
-	pfc_selector1 = fj.SelectorPtMin(1.)
+	#parts_selector = fj.SelectorPtMin(0.15) & fj.SelectorAbsEtaMax(max_eta_hadron)
+	#jet_selector = fj.SelectorPtMin(20) & fj.SelectorPtMax(40) & fj.SelectorAbsEtaMax(max_eta_jet)
+	parts_selector = fj.SelectorAbsEtaMax(max_eta_hadron)
+	jet_selector = fj.SelectorPtMin(5) & fj.SelectorAbsEtaMax(max_eta_jet)  
 
 	# print the banner first
 	fj.ClusterSequence.print_banner()

@@ -9,9 +9,9 @@
 
 // usage
 // CLOSURE
-// root -q "unfold.C(\"preunfold_closure.root\", \"unfolded_closure_new.root\", 8)"
+// root -q "unfold.C(\"preunfold_closure_new.root\", \"unfolded_closure_new.root\", 5)"
 // FULLSIM / DATA
-// root -q "unfold.C(\"preunfold_fr.root\", \"unfolded_fr_new.root\", 8)"
+// root -q "unfold.C(\"preunfold_fr_new.root\", \"unfolded_fr_new.root\", 5)"
 
 
 void unfold(const TString& infile="preunfold.root", const TString& outfile="unfolded.root", int iter=9) {

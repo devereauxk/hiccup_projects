@@ -7,7 +7,7 @@
 # CLOSURE
 # python3 construct_response.py --mc_file ../pp_unfolding/preprocess_sigma335_400k.root --data_file ../pp_unfolding/preprocess_sigma2_400k.root --output_file ./preunfold_closure_new.root --closure True
 # FULL SIM / DATA
-# python3 construct_response.py --mc_file /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/mc-13794540/merged_small.root --data_file /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/data-13796056/merged_medium.root --output_file ./preunfold_fr.root
+# python3 construct_response.py --mc_file /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/mc-13794540/merged_small.root --data_file /global/cfs/cdirs/alice/kdevero/pp_alice_unfolding/AnalysisResults/data-13796056/merged_medium.root --output_file ./preunfold_fr_new.root
 
 
 # imports
@@ -20,8 +20,10 @@ ROOT.gSystem.Load("libRooUnfold.so")
 verbose = 1
 
 # define binnings
-n_bins = [9, 9, 9] # WARNING RooUnfold seg faults if too many bins used
-binnings = [np.logspace(-5,0,10),np.logspace(-4,0,10),np.linspace(20,40,10)]
+n_bins = [20, 20, 6] # WARNING RooUnfold seg faults if too many bins used
+binnings = [np.logspace(-5,0,n_bins[0]+1), \
+            np.logspace(-4,0,n_bins[1]+1), \
+            np.array([5, 20, 40, 60, 80, 100, 150]).astype(float) ]
 
 gen_features = ["gen_energy_weight", "gen_R_L", "gen_jet_pt"]
 obs_features = ["obs_energy_weight", "obs_R_L", "obs_jet_pt"]
@@ -33,6 +35,8 @@ def construct_response(n_mc_file="preprocessed_mc.root", n_out="preunfold.root")
 
     fout = ROOT.TFile(n_out, 'UPDATE')
     fout.cd()
+
+    print(binnings)
 
     h3_reco = ROOT.TH3D("reco", "reco", n_bins[0], binnings[0], n_bins[1], binnings[1], n_bins[2], binnings[2])
     h3_gen = ROOT.TH3D("gen", "gen", n_bins[0], binnings[0], n_bins[1], binnings[1], n_bins[2], binnings[2])
@@ -104,9 +108,13 @@ def constructed_data_hist(n_data_file="preprocessed_data.root", n_out="preunfold
     h3_raw = ROOT.TH3D("raw", "raw", n_bins[0], binnings[0], n_bins[1], binnings[1], n_bins[2], binnings[2])
     h1_raw =  ROOT.TH1D("raw1D", "raw1D", n_bins[2], binnings[2])
 
+    h2_raw_eec = ROOT.TH2D("raw_eec", "raw_eec", n_bins[1], binnings[1], n_bins[2], binnings[2])
+
     if closure:
         h3_true = ROOT.TH3D("true", "true", n_bins[0], binnings[0], n_bins[1], binnings[1], n_bins[2], binnings[2])
         h1_true =  ROOT.TH1D("true1D", "true1D", n_bins[2], binnings[2])
+
+        h2_true_eec = ROOT.TH2D("true_eec", "true_eec", n_bins[1], binnings[1], n_bins[2], binnings[2])
 
     natural_tree = ur.open("%s:preprocessed"%(n_data_file))
     natural_df = natural_tree.arrays(library="pd")
@@ -135,8 +143,11 @@ def constructed_data_hist(n_data_file="preprocessed_data.root", n_out="preunfold
             [weight_obs, rl_obs, jetpt_obs] = row
 
         h3_raw.Fill(weight_obs, rl_obs, jetpt_obs)
+        h2_raw_eec.Fill(rl_obs, jetpt_obs, weight_obs)
+
         if closure:
             h3_true.Fill(weight_gen, rl_gen, jetpt_gen)
+            h2_true_eec.Fill(rl_gen, jetpt_gen, weight_gen)
         
         # only fill 1D jetpt unfolding matrix once per jet
         if jetpt_obs >= 0 and jetpt_obs != last_jetpt_obs:
@@ -148,9 +159,11 @@ def constructed_data_hist(n_data_file="preprocessed_data.root", n_out="preunfold
 
     h3_raw.Write()
     h1_raw.Write()
+    h2_raw_eec.Write()
     if closure:
         h3_true.Write()
         h1_true.Write()
+        h2_raw_eec.Write()
 
     fout.Write()
     fout.Close()
