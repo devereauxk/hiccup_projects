@@ -22,8 +22,9 @@ verbose = 1
 # define binnings
 n_bins = [20, 20, 6] # WARNING RooUnfold seg faults if too many bins used
 binnings = [np.logspace(-5,0,n_bins[0]+1), \
-            np.logspace(-4,0,n_bins[1]+1), \
+            np.logspace(-2.09,0,n_bins[1]+1), \
             np.array([5, 20, 40, 60, 80, 100, 150]).astype(float) ]
+# using 8E-3 as the lower rl bin: solve 10^x = 8*10^(-3) 
 
 gen_features = ["gen_energy_weight", "gen_R_L", "gen_jet_pt"]
 obs_features = ["obs_energy_weight", "obs_R_L", "obs_jet_pt"]

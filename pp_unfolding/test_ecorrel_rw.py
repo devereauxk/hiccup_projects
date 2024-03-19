@@ -33,7 +33,7 @@ import uproot as ur
 import yaml
 
 # usage
-# python test_ecorrel_rw.py --nev 400000 --output "./preprocess_sigma335_400k.root"
+# python test_ecorrel_rw.py --nev 400000 --output "./preprocess_sigma2_400k.root"
 
 dummyval = -9999
 
@@ -94,7 +94,7 @@ def get_args_from_settings(ssettings):
 
 def main():
 	mycfg = []
-	mycfg.append("StringPT:sigma=0.335") # for producing slightly different data sets, default is 0.335 GeV
+	mycfg.append("StringPT:sigma=0.2") # for producing slightly different data sets, default is 0.335 GeV
 	ssettings = "--py-ecm 5020 --py-pthatmin 5"
 	args = get_args_from_settings(ssettings)
 	pythia_hard = pyconf.create_and_init_pythia_from_args(args, mycfg)
@@ -163,7 +163,7 @@ def main():
 		#======================================
 		#            Particle level
 		#======================================
-		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal], 0, True)
+		parts_pythia_p = pythiafjext.vectorize_select(pythia_hard, [pythiafjext.kFinal, pythiafjext.kCharged], 0, True)
 		parts_pythia_p_selected = parts_selector(parts_pythia_p)
 
 		# assign an event-level index to each particle (zero-indexed)
